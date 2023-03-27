@@ -22,13 +22,6 @@ data class ERC20Contract(
 ) : ContractSpecification {
 
     companion object {
-        /**
-         * Functions:
-         *
-         * Encoded functions' signatures are obtained like this:
-         * keccak256(canonicalName).slice(0, 4).toString('hex')
-         * With canonical name being the function's signature stripped off params and whitespaces.
-         */
 
         /**
          * function name() public view returns (string)
@@ -74,15 +67,6 @@ data class ERC20Contract(
          * function allowance(address _owner, address _spender) public view returns (uint256 remaining)
          */
         const val ALLOWANCE_FUNCTION_SIGNATURE = "dd62ed3e"
-
-
-        /**
-         * Events:
-         *
-         * Encoded events' signatures are obtained like this:
-         * keccak256(canonicalName).toString('hex')
-         * With canonical name being the event's signature stripped off params and whitespaces.
-         */
 
         /**
          * event Transfer(address indexed _from, address indexed _to, uint256 _value)
