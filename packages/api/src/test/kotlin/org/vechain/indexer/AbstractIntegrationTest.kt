@@ -1,10 +1,6 @@
 package org.vechain.indexer
 
 import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinFeature
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
 import org.junit.runner.RunWith
@@ -17,8 +13,10 @@ import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit4.SpringRunner
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.utility.TestcontainersConfiguration
 import org.vechain.indexer.model.*
 import org.vechain.indexer.repos.*
+import org.vechain.indexer.utils.JsonUtils
 import java.util.*
 
 
@@ -40,19 +38,10 @@ abstract class AbstractIntegrationTest {
     protected val CLAUSES_TYPE = object : TypeReference<List<WrappedClause>>() {}
     protected val CLAUSES_RESPONSE_TYPE = object : TypeReference<PaginatedResponse<List<WrappedClause>>>() {}
 
-    protected val objectMapper = ObjectMapper()
+    protected val objectMapper = JsonUtils.mapper
 
     init {
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        objectMapper.registerModule(
-            KotlinModule.Builder()
-                .withReflectionCacheSize(512)
-                .configure(KotlinFeature.NullToEmptyCollection, false)
-                .configure(KotlinFeature.NullToEmptyMap, false)
-                .configure(KotlinFeature.NullIsSameAsDefault, false)
-                .configure(KotlinFeature.StrictNullChecks, false)
-                .build()
-        )
+        TestcontainersConfiguration.getInstance().updateUserConfig("testcontainers.reuse.enable", "true")
     }
 
     @Autowired
@@ -111,14 +100,12 @@ abstract class AbstractIntegrationTest {
         return objectMapper.readValue(rawJson, type)
     }
 
-    companion object {
-        val mongoContainer: GenericContainer<*> = GenericContainer("mongo:6")
-            .withExposedPorts(27017)
-            .withReuse(true)
-    }
-
-    internal class Initializer : ApplicationContextInitializer<ConfigurableApplicationContext> {
+    internal class Initializer :
+        ApplicationContextInitializer<ConfigurableApplicationContext> {
         override fun initialize(configurableApplicationContext: ConfigurableApplicationContext) {
+            val mongoContainer: GenericContainer<*> = GenericContainer("mongo:6")
+                .withExposedPorts(27017)
+                .withReuse(true)
 
             mongoContainer.start()
 
