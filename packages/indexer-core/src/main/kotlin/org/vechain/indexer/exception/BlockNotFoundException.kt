@@ -1,4 +1,4 @@
 package org.vechain.indexer.exception
 
-class BlockNotFoundException(message: String, val blockNumber: Long) :
+class BlockNotFoundException(message: String) :
     Exception(message)
