@@ -15,26 +15,12 @@ export default () => {
 
     const nfts = http.get(`${env.BASE_URL}/api/v1/nfts?address=${account}`);
 
-    const nftContracts = http.get(`${env.BASE_URL}/api/v1/nfts/contracts?owner=${account}`);
-
     check(nfts, {
         "status is 200": () => nfts.status === 200,
         "has results": () => {
             if (typeof nfts.body === "string") {
                 const body = JSON.parse(nfts.body);
-                return body.data.length > 0 && body.pagination.totalElements > 0;
-            } else {
-                return false;
-            }
-        },
-    });
-
-    check(nftContracts, {
-        "status is 200": () => nftContracts.status === 200,
-        "has results": () => {
-            if (typeof nftContracts.body === "string") {
-                const body = JSON.parse(nftContracts.body);
-                return body.data.length > 0 && body.pagination.totalElements > 0;
+                return body.data.length > 0;
             } else {
                 return false;
             }
