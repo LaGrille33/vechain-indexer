@@ -14,18 +14,18 @@ abstract class BaseIndexer(
     abiManager: AbiManager? = null,
     businessEventManager: BusinessEventManager? = null,
 ) :
-    Indexer(
+    BlockIndexer(
         thorClient = thorClient,
         startBlock = startBlock,
         syncLogInterval,
         abiManager,
-        businessEventManager
+        businessEventManager,
     ) {
-
     override fun getLastSyncedBlock(): BlockIdentifier? {
         repository.getLatestRecord()?.let {
             return BlockIdentifier(number = it.blockNumber, id = it.blockId)
         }
+        logger.info("No records found in repository, returning null")
         return null
     }
 }
