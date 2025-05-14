@@ -8,10 +8,10 @@ import org.springframework.context.annotation.Profile
 import org.springframework.data.domain.Sort
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.index.Index
-import org.vechain.indexer.model.VevoteProposalComment
+import org.vechain.indexer.model.vevote.VevoteProposalComment
 import org.vechain.indexer.service.IndexerVersionService
 
-@Profile("vevote-events")
+@Profile("vevote-comments")
 @Configuration
 open class VeVoteProposalCommentsConfig(
     mongoTemplate: MongoTemplate,
