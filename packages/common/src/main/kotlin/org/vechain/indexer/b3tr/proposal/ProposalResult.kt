@@ -2,12 +2,12 @@ package org.vechain.indexer.b3tr.proposal
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import java.math.BigInteger
-import org.apache.commons.codec.digest.DigestUtils
 import org.springframework.boot.context.properties.bind.ConstructorBinding
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.Document
 import org.vechain.indexer.VersionedDocument
 import org.vechain.indexer.archive.Archive
+import org.vechain.indexer.b3tr.action.IdUtils.generateId
 import org.vechain.indexer.b3tr.voting.Support
 
 @Document(collection = "b3tr_proposal_results")
@@ -37,7 +37,7 @@ constructor(
         totalPower: BigInteger,
     ) : this(
         version = version,
-        id = calculateId(proposalId, support),
+        id = generateId("$proposalId", support.name),
         blockId = blockId,
         blockNumber = blockNumber,
         blockTimestamp = blockTimestamp,
@@ -49,11 +49,6 @@ constructor(
     )
 
     @JsonIgnore override fun getDocumentId(): String = id
-
-    companion object {
-        fun calculateId(proposalId: String, support: Support): String =
-            DigestUtils.sha1Hex("$proposalId-$support")
-    }
 }
 
 @Document(collection = "b3tr_proposal_result_archives")
