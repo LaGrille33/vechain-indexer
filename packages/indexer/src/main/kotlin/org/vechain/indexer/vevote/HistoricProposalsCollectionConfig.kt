@@ -13,14 +13,14 @@ import org.vechain.indexer.IndexerNames.HISTORIC_PROPOSALS
 import org.vechain.indexer.config.mongo.CollectionConfig
 import org.vechain.indexer.version.IndexerVersionService
 
-@Profile("vevote", "vevote-historic-proposals")
+@Profile("vevote-historic-proposals")
 @Configuration
 open class HistoricProposalsCollectionConfig(
     mongoTemplate: MongoTemplate,
     appCoroutineScope: CoroutineScope,
     private val indexerVersionService: IndexerVersionService,
 ) : CollectionConfig(mongoTemplate, appCoroutineScope, HistoricProposals::class.java) {
-    private val logger = LoggerFactory.getLogger(this::class.java)
+    private val logger = LoggerFactory.getLogger(HistoricProposalsCollectionConfig::class.java)
 
     @Value("\${indexer.version.historic-proposals}") private val version: Int = 1
 
