@@ -247,6 +247,56 @@
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "relayer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "cycle",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "voter",
+        "type": "address"
+      }
+    ],
+    "name": "RelayerFeeTaken",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newAddress",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldAddress",
+        "type": "address"
+      }
+    ],
+    "name": "RelayerRewardsPoolAddressUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "uint256",
         "name": "cycle",
         "type": "uint256"
@@ -415,6 +465,19 @@
       }
     ],
     "name": "VoteRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newAddress",
+        "type": "address"
+      }
+    ],
+    "name": "XAllocationVotingAddressUpdated",
     "type": "event"
   },
   {
@@ -712,6 +775,30 @@
         "type": "address"
       }
     ],
+    "name": "getRelayerFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "cycle",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "voter",
+        "type": "address"
+      }
+    ],
     "name": "getReward",
     "outputs": [
       {
@@ -901,6 +988,24 @@
   {
     "inputs": [
       {
+        "internalType": "contract IXAllocationVotingGovernor",
+        "name": "_xAllocationVoting",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IRelayerRewardsPool",
+        "name": "_relayerRewardsPool",
+        "type": "address"
+      }
+    ],
+    "name": "initializeV6",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint48",
         "name": "blockNumber",
         "type": "uint48"
@@ -988,6 +1093,19 @@
     "name": "registerVote",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "relayerRewardsPool",
+    "outputs": [
+      {
+        "internalType": "contract IRelayerRewardsPool",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1091,6 +1209,32 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_relayerRewardsPool",
+        "type": "address"
+      }
+    ],
+    "name": "setRelayerRewardsPool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_xAllocationVoting",
+        "type": "address"
+      }
+    ],
+    "name": "setXAllocationVoting",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes4",
         "name": "interfaceId",
         "type": "bytes4"
@@ -1143,6 +1287,19 @@
       }
     ],
     "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "xAllocationVoting",
+    "outputs": [
+      {
+        "internalType": "contract IXAllocationVotingGovernor",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]
