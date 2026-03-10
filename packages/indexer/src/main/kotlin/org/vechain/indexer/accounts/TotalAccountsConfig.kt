@@ -11,6 +11,7 @@ import org.vechain.indexer.thor.client.ThorClient
 
 @Configuration
 @Profile("accounts", "total-accounts")
+@Deprecated("V1 total-accounts config is deprecated. Use AccountTotalsSeriesConfig instead.")
 open class TotalAccountsConfig {
     @Bean
     open fun totalAccountsIndexer(
