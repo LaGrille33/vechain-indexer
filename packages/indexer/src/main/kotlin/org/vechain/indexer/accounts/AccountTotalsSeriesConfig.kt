@@ -18,8 +18,6 @@ open class AccountTotalsSeriesConfig {
         processor: AccountTotalsSeriesProcessor,
         @Value("\${indexer.sync-log-interval}") syncLoggerInterval: Long,
         @Value("\${indexer.start-block.account-totals-series:0}") startBlock: Long,
-        @Value("\${indexer.sync-block-batch-size.account-totals-series:100}")
-        syncBlockBatchSize: Long,
     ): BlockIndexer =
         IndexerFactory()
             .name(IndexerNames.ACCOUNT_TOTALS_SERIES.NAME)
@@ -27,7 +25,6 @@ open class AccountTotalsSeriesConfig {
             .processor(processor)
             .startBlock(startBlock)
             .syncLoggerInterval(syncLoggerInterval)
-            .blockBatchSize(syncBlockBatchSize)
             .includeFullBlock()
             .build()
 }
