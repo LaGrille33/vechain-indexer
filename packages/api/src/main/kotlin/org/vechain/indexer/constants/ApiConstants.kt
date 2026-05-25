@@ -24,6 +24,7 @@ const val NAVIGATOR_PATH = "$B3TR_PATH/navigators"
 const val CHALLENGES_PATH = "$B3TR_PATH/challenges"
 const val WALLET_CHALLENGES_PATH = "$B3TR_PATH/users/{wallet}/challenges"
 const val EXPLORER_PATH = "$API_PATH/explorer"
+const val XAPP_PATH = "$API_PATH/xapp"
 const val ACCOUNTS_PATH = "$API_PATH/accounts"
 const val CONTRACTS_PATH = "$API_PATH/contracts"
 

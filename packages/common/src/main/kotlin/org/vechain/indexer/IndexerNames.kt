@@ -266,6 +266,16 @@ object IndexerNames {
         const val COLLECTION = "safe_tx_proposals"
     }
 
+    object XAPP_REVIEW {
+        const val NAME = "XAppReviewIndexer"
+        const val COLLECTION = "xapp_reviews"
+    }
+
+    object XAPP_SCORING_ROUND {
+        const val NAME = "XAppScoringRoundIndexer"
+        const val COLLECTION = "xapp_scoring_rounds"
+    }
+
     /** Returns a map of indexer NAME → COLLECTION for every nested object that defines both. */
     fun nameToCollection(): Map<String, String> =
         IndexerNames::class

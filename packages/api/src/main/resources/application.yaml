@@ -62,10 +62,10 @@ management:
 spring.data:
   mongodb:
     auto-index-creation: false
-    uri: ${MONGO_URI:mongodb://api:password@localhost:27017/vechain?authSource=admin}
+    uri: ${MONGO_URI:mongodb://api:password@113.31.105.33:27017/vechain?authSource=admin}
 
 thor:
-  url: ${THOR_URL:https://testnet.vechain.org}
+  url: ${THOR_URL:http://localhost:8669}
 
 vechain:
   forks:
