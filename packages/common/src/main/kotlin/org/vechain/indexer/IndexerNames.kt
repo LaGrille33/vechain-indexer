@@ -266,6 +266,11 @@ object IndexerNames {
         const val COLLECTION = "safe_tx_proposals"
     }
 
+    object XAPP_BADGE_AWARD {
+        const val NAME = "XAppBadgeAwardIndexer"
+        const val COLLECTION = "xapp_badge_awards"
+    }
+
     object XAPP_REVIEW {
         const val NAME = "XAppReviewIndexer"
         const val COLLECTION = "xapp_reviews"
