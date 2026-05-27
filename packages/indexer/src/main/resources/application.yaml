@@ -126,6 +126,17 @@ veworld:
       all-stakeholders: ${ALL_STAKEHOLDERS_ADDRESS:0xA6416A72F816d3a69f33D0814700545C8E3fe4BE}
       legacy-descriptions: ${LEGACY_DESCRIPTIONS_ADDRESS:0x6957f76d0749EbF4d098F5EDba1F657635F0D483}
 indexer:
+  user-first-seen:
+    interval-ms: ${INDEXER_USER_FIRST_SEEN_INTERVAL_MS:3600000}
+    initial-delay-ms: ${INDEXER_USER_FIRST_SEEN_INITIAL_DELAY_MS:60000}
+  onchain-scoring:
+    interval-ms: ${INDEXER_ONCHAIN_SCORING_INTERVAL_MS:3600000}
+    initial-delay-ms: ${INDEXER_ONCHAIN_SCORING_INITIAL_DELAY_MS:600000}
+  discord:
+    bot-token: ${DISCORD_BOT_TOKEN:}
+    channels: ${DISCORD_CHANNELS:}
+    interval-ms: ${INDEXER_DISCORD_INTERVAL_MS:3600000}
+    initial-delay-ms: ${INDEXER_DISCORD_INITIAL_DELAY_MS:60000}
   genesis:
     vet-balances:
       # Optional override; if empty, inferred from Thor genesis block id (block 0)

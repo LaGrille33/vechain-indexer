@@ -266,6 +266,11 @@ object IndexerNames {
         const val COLLECTION = "safe_tx_proposals"
     }
 
+    object USER_FIRST_SEEN {
+        const val NAME = "UserFirstSeenAggregator"
+        const val COLLECTION = "b3tr_user_first_seen"
+    }
+
     object XAPP_BADGE_AWARD {
         const val NAME = "XAppBadgeAwardIndexer"
         const val COLLECTION = "xapp_badge_awards"
@@ -279,6 +284,21 @@ object IndexerNames {
     object XAPP_SCORING_ROUND {
         const val NAME = "XAppScoringRoundIndexer"
         const val COLLECTION = "xapp_scoring_rounds"
+    }
+
+    object ONCHAIN_SCORE {
+        const val NAME = "OnchainScoringAggregator"
+        const val COLLECTION = "b3tr_onchain_scores"
+    }
+
+    object ECOSYSTEM_ROUND_SNAPSHOT {
+        const val NAME = "EcosystemRoundSnapshotAggregator"
+        const val COLLECTION = "b3tr_ecosystem_round_snapshots"
+    }
+
+    object DISCORD_MESSAGE {
+        const val NAME = "DiscordMessageFetcher"
+        const val COLLECTION = "discord_messages"
     }
 
     /** Returns a map of indexer NAME → COLLECTION for every nested object that defines both. */
