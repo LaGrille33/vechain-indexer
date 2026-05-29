@@ -301,6 +301,11 @@ object IndexerNames {
         const val COLLECTION = "discord_messages"
     }
 
+    object APP_CYCLE_SCORE {
+        const val NAME = "AppCycleScoringAggregator"
+        const val COLLECTION = "b3tr_app_cycle_scores"
+    }
+
     /** Returns a map of indexer NAME → COLLECTION for every nested object that defines both. */
     fun nameToCollection(): Map<String, String> =
         IndexerNames::class
