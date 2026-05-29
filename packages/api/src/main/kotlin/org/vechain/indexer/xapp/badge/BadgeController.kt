@@ -1,6 +1,8 @@
 package org.vechain.indexer.xapp.badge
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.context.annotation.Profile
 import org.springframework.validation.annotation.Validated
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.vechain.indexer.constants.XAPP_PATH
+import org.vechain.indexer.docs.AppIdParameter
 import org.vechain.indexer.docs.CommonApiResponses
 import org.vechain.indexer.docs.PaginationParameters
 import org.vechain.indexer.rest.PaginatedResponse
@@ -27,12 +30,15 @@ open class BadgeController(private val service: BadgeApiService) {
 
     @GetMapping("/apps/{appId}/badges")
     @Operation(summary = "Get badge summary for an app. Returns all three badge types with stats.")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
     @CommonApiResponses
     open fun getAppBadges(@PathVariable appId: String): List<BadgeSummary> =
         service.getAppBadges(appId)
 
     @GetMapping("/apps/{appId}/badges/{badgeType}")
     @Operation(summary = "Get badge detail for a specific badge type.")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
     @CommonApiResponses
     open fun getBadgeDetail(
         @PathVariable appId: String,
@@ -41,6 +47,8 @@ open class BadgeController(private val service: BadgeApiService) {
 
     @PutMapping("/apps/{appId}/badges/{badgeType}/visibility")
     @Operation(summary = "Update badge visibility (Published/Unpublished).")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
     @CommonApiResponses
     open fun updateBadgeVisibility(
         @PathVariable appId: String,
@@ -53,6 +61,8 @@ open class BadgeController(private val service: BadgeApiService) {
 
     @GetMapping("/apps/{appId}/badges/{badgeType}/records")
     @Operation(summary = "Get paginated badge award records for a specific badge type.")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
     @CommonApiResponses
     @PaginationParameters
     open fun getBadgeRecords(
@@ -74,6 +84,7 @@ open class BadgeController(private val service: BadgeApiService) {
             "Get public badges for app detail display. " +
                 "Returns badges from the latest round that are published."
     )
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
     @CommonApiResponses
     open fun getPublicBadges(@PathVariable appId: String): List<BadgeAward> =
         service.getPublicBadges(appId)

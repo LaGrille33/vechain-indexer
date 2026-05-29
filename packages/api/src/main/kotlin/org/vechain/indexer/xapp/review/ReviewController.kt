@@ -1,6 +1,7 @@
 package org.vechain.indexer.xapp.review
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.context.annotation.Profile
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.vechain.indexer.constants.XAPP_PATH
 import org.vechain.indexer.docs.AddressParameter
+import org.vechain.indexer.docs.AppIdParameter
 import org.vechain.indexer.docs.CommonApiResponses
 import org.vechain.indexer.docs.PaginationParameters
 import org.vechain.indexer.rest.PaginatedResponse
@@ -30,6 +32,9 @@ open class ReviewController(private val service: ReviewApiService) {
 
     @GetMapping("/apps/{appId}/reviews")
     @Operation(summary = "Get reviews for an app.")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @Parameter(name = "sortBy", description = "Sort field: upvotes/most_upvotes (by upvote count), downvotes/most_downvotes (by downvote count), reports/most_reports (by report count), defaults to timestamp")
+    @Parameter(name = "author", description = "Filter by author address (checksummed format)")
     @CommonApiResponses
     @PaginationParameters
     open fun getAppReviews(
@@ -76,11 +81,14 @@ open class ReviewController(private val service: ReviewApiService) {
 
     @GetMapping("/reviews/{reviewId}")
     @Operation(summary = "Get a single review by ID.")
+    @Parameter(name = "reviewId", description = "Review ID", `in` = ParameterIn.PATH, example = "6")
     @CommonApiResponses
     open fun getReview(@PathVariable reviewId: Long): Review = service.getReview(reviewId)
 
     @GetMapping("/reviews/{reviewId}/votes")
     @Operation(summary = "Get vote history for a review.")
+    @Parameter(name = "reviewId", description = "Review ID", `in` = ParameterIn.PATH, example = "6")
+    @Parameter(name = "search", description = "Search by voter address")
     @CommonApiResponses
     @PaginationParameters
     open fun getReviewVotes(

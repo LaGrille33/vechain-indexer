@@ -6,6 +6,7 @@ dependencies {
     // Required by ContractUtils for ABI encoding (createClause) and keccak signature derivation.
     implementation("com.github.vechain:thor-devkit.java:v1.0.0")
     implementation("org.web3j:utils:4.12.1")
+    compileOnly("io.swagger.core.v3:swagger-annotations-jakarta:2.2.25")
 
     testImplementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo.spring3x:4.23.0")
 }
