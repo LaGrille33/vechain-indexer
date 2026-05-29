@@ -1,15 +1,23 @@
 package org.vechain.indexer.xapp.badge
 
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonValue
 import org.springframework.boot.context.properties.bind.ConstructorBinding
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.Document
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.VersionedDocument
 
-enum class BadgeType {
-    TOP_ECOSYSTEM_DAPP,
-    TOP_DISTRIBUTION_PERFORMER,
-    NAVIGATORS_PICK,
+enum class BadgeType(@JsonValue val value: String) {
+    TOP_ECOSYSTEM_DAPP("topEcosystemDapp"),
+    TOP_DISTRIBUTION_PERFORMER("topDistributionPerformer"),
+    NAVIGATORS_PICK("navigatorsPick");
+
+    companion object {
+        @JsonCreator
+        @JvmStatic
+        fun fromValue(value: String): BadgeType = entries.first { it.value == value }
+    }
 }
 
 @Document(collection = IndexerNames.XAPP_BADGE_AWARD.COLLECTION)
@@ -38,7 +46,7 @@ constructor(
         rank: Int,
         isPublished: Boolean = true,
     ) : this(
-        id = "${appId}_${badgeType.name}_$round",
+        id = "${appId}_${badgeType.value}_$round",
         version = version,
         blockId = blockId,
         blockNumber = blockNumber,
@@ -72,5 +80,13 @@ data class BadgeDetail(
 )
 
 data class BadgeRecord(val round: Long, val rank: Int, val date: Long)
+
+data class BadgeRoundInfo(val round: Long, val rank: Int, val date: String)
+
+data class BadgeStatsResponse(
+    val totalCount: Int,
+    val latestRound: Long?,
+    val rounds: List<BadgeRoundInfo>,
+)
 
 data class BadgeVisibilityRequest(val isPublished: Boolean)

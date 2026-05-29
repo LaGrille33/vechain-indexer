@@ -1,6 +1,7 @@
 package org.vechain.indexer.xapp.badge
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.context.annotation.Profile
 import org.springframework.validation.annotation.Validated
@@ -67,6 +68,22 @@ open class BadgeController(private val service: BadgeApiService) {
             badgeType = badgeType,
             pageable = toPageable(page, size, direction ?: "desc", "round"),
         )
+
+    @GetMapping("/apps/{appId}/badges/stats")
+    @Operation(summary = "Get badge stats: total count, latest round, and all round rankings.")
+    @CommonApiResponses
+    open fun getBadgeStats(
+        @Parameter(description = "The unique identifier of the app.", required = true)
+        @PathVariable
+        appId: String,
+        @Parameter(
+            description =
+                "The type of badge to query. Allowed values: topEcosystemDapp, topDistributionPerformer, navigatorsPick.",
+            required = true,
+        )
+        @RequestParam
+        badgeType: String,
+    ): BadgeStatsResponse = service.getBadgeStats(appId, badgeType)
 
     @GetMapping("/apps/{appId}/badges/public")
     @Operation(
