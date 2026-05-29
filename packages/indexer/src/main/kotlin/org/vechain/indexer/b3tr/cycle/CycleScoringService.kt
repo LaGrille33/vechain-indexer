@@ -3,6 +3,7 @@ package org.vechain.indexer.b3tr.cycle
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.math.ceil
 import kotlin.math.log2
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -19,6 +20,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.onchain.AppOnchainScore
+import org.vechain.indexer.xapp.badge.BadgeType
 
 @Service
 @Profile("b3tr", "b3tr-cycle-scoring")
@@ -309,6 +311,10 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
 
         logger.info("Round {} scored: {} apps", roundId, count)
         logSummary(sorted, roundId, topN)
+
+        // Award badges for this round
+        awardBadges(roundId, sorted)
+
         return count
     }
 
@@ -529,6 +535,119 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
             corrobs >= 1 -> "Medium"
             else -> "Low"
         }
+    }
+
+    // ── Badge awarding ────────────────────────────────────────────────────
+
+    private fun awardBadges(roundId: Int, sorted: List<ScoredApp>) {
+        val badgeCollection = IndexerNames.XAPP_BADGE_AWARD.COLLECTION
+        val now = System.currentTimeMillis()
+
+        // 1. APP评分徽章 (TOP_ECOSYSTEM_DAPP): top 10% by total score
+        awardTopPercentageBadge(
+            badgeCollection,
+            roundId,
+            sorted,
+            BadgeType.TOP_ECOSYSTEM_DAPP,
+            valueSelector = { it.total.toDouble() },
+            allowTieExpansion = true,
+            now = now,
+        )
+
+        // 2. 高效分发徽章 (TOP_DISTRIBUTION_PERFORMER): top 10% by onchainDistributionScore
+        val withDistScore = sorted.filter { it.onchainScore?.distributionScore != null }
+        awardTopPercentageBadge(
+            badgeCollection,
+            roundId,
+            withDistScore,
+            BadgeType.TOP_DISTRIBUTION_PERFORMER,
+            valueSelector = { it.onchainScore?.distributionScore?.toDouble() ?: 0.0 },
+            allowTieExpansion = false,
+            now = now,
+        )
+    }
+
+    private fun awardTopPercentageBadge(
+        badgeCollection: String,
+        roundId: Int,
+        apps: List<ScoredApp>,
+        badgeType: BadgeType,
+        valueSelector: (ScoredApp) -> Double,
+        allowTieExpansion: Boolean,
+        now: Long,
+    ) {
+        if (apps.isEmpty()) return
+
+        // Sort descending by value, then by appId for stable ordering
+        val ranked =
+            apps.sortedWith(
+                compareByDescending<ScoredApp> { valueSelector(it) }.thenBy { it.appId }
+            )
+
+        // Top 10%, rounded up (ceil). Minimum 1.
+        val topCount = maxOf(1, ceil(ranked.size * 0.1).toInt())
+
+        // Assign ranks with tie handling
+        val rankedApps = mutableListOf<Pair<ScoredApp, Int>>()
+        var currentRank = 1
+        for (i in ranked.indices) {
+            if (i > 0) {
+                val prevValue = valueSelector(ranked[i - 1])
+                val currValue = valueSelector(ranked[i])
+                if (currValue != prevValue) {
+                    currentRank = i + 1
+                }
+            }
+            // Only include apps within the top 10%
+            if (allowTieExpansion) {
+                // Include if rank <= topCount, or if tied with the last included app
+                if (currentRank <= topCount) {
+                    rankedApps.add(ranked[i] to currentRank)
+                } else {
+                    // Check if tied with the last included app
+                    val lastIncludedValue = valueSelector(rankedApps.last().first)
+                    if (valueSelector(ranked[i]) == lastIncludedValue) {
+                        rankedApps.add(ranked[i] to currentRank)
+                    }
+                }
+            } else {
+                if (currentRank <= topCount) {
+                    rankedApps.add(ranked[i] to currentRank)
+                }
+            }
+        }
+
+        if (rankedApps.isEmpty()) return
+
+        // Bulk upsert badge awards
+        val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, badgeCollection)
+        for ((app, rank) in rankedApps) {
+            val id = "${app.appId}_${badgeType.value}_$roundId"
+            bulkOps.upsert(
+                Query(Criteria.where("_id").`is`(id)),
+                Update()
+                    .set("_id", id)
+                    .set("version", 1)
+                    .set("blockId", "")
+                    .set("blockNumber", 0L)
+                    .set("blockTimestamp", now)
+                    .set("appId", app.appId)
+                    .set("badgeType", badgeType.value)
+                    .set("round", roundId.toLong())
+                    .set("rank", rank)
+                    .set("isPublished", true),
+            )
+        }
+        bulkOps.execute()
+
+        logger.info(
+            "Round {}: awarded {} {} badges (top {}% of {} apps)",
+            roundId,
+            rankedApps.size,
+            badgeType.name,
+            topCount,
+            apps.size,
+        )
     }
 
     // ── Logging ──────────────────────────────────────────────────────────

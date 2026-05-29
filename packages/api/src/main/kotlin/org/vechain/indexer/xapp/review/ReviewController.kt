@@ -57,14 +57,9 @@ open class ReviewController(private val service: ReviewApiService) {
     )
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
     @Parameter(
-        name = "wallet",
-        description =
-            "Current user's wallet address (enables myVoteType + shows hidden reviews to author + my_reviews filter)",
-    )
-    @Parameter(
         name = "sortBy",
         description =
-            "Sort: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews (only current user's reviews)",
+            "Sort field: upvotes/most_upvotes (by upvote count), downvotes/most_downvotes (by downvote count), reports/most_reports (by report count), defaults to timestamp",
     )
     @Parameter(name = "author", description = "Filter by author address (checksummed format)")
     @CommonApiResponses

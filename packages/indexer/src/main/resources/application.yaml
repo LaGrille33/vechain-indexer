@@ -135,7 +135,10 @@ indexer:
     initial-delay-ms: ${INDEXER_ONCHAIN_SCORING_INITIAL_DELAY_MS:600000}
   cycle-scoring:
     interval-ms: ${INDEXER_CYCLE_SCORING_INTERVAL_MS:7200000}
-    initial-delay-ms: ${INDEXER_CYCLE_SCORING_INITIAL_DELAY_MS:2400000}
+    initial-delay-ms: ${INDEXER_CYCLE_SCORING_INITIAL_DELAY_MS:30000}
+  cycle-info:
+    interval-ms: ${INDEXER_CYCLE_INFO_INTERVAL_MS:3600000}
+    initial-delay-ms: ${INDEXER_CYCLE_INFO_INITIAL_DELAY_MS:30000}
   discord:
     bot-token: ${DISCORD_BOT_TOKEN:}
     channels: ${DISCORD_CHANNELS:}
