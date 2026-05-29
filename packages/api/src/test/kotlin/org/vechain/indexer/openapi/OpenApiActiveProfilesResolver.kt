@@ -26,6 +26,9 @@ class OpenApiActiveProfilesResolver : ActiveProfilesResolver {
                     "validator",
                     "validator-reward",
                     "vevote",
+                    "xapp-badge",
+                    "xapp-review",
+                    "xapp-scoring",
                 )
                 .sorted()
 

@@ -1,6 +1,8 @@
 package org.vechain.indexer.xapp.scoring
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.context.annotation.Profile
 import org.springframework.validation.annotation.Validated
@@ -36,6 +38,7 @@ open class ScoringController(private val service: ScoringApiService) {
 
     @GetMapping("/scoring/rounds/{round}")
     @Operation(summary = "Get a single scoring round by round number.")
+    @Parameter(name = "round", description = "Round number", `in` = ParameterIn.PATH, example = "1")
     @CommonApiResponses
     open fun getRound(@PathVariable round: Long): ScoringRound = service.getRound(round)
 }
