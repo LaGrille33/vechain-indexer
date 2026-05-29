@@ -281,6 +281,16 @@ object IndexerNames {
         const val COLLECTION = "xapp_reviews"
     }
 
+    object XAPP_RATING {
+        const val NAME = "XAppRatingIndexer"
+        const val COLLECTION = "xapp_ratings"
+    }
+
+    object XAPP_REVIEW_VOTE {
+        const val NAME = "XAppReviewVoteIndexer"
+        const val COLLECTION = "xapp_review_votes"
+    }
+
     object XAPP_SCORING_ROUND {
         const val NAME = "XAppScoringRoundIndexer"
         const val COLLECTION = "xapp_scoring_rounds"

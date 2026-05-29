@@ -38,7 +38,12 @@ open class BadgeController(private val service: BadgeApiService) {
     @GetMapping("/apps/{appId}/badges/{badgeType}")
     @Operation(summary = "Get badge detail for a specific badge type.")
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
-    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
+    @Parameter(
+        name = "badgeType",
+        description = "Badge type",
+        `in` = ParameterIn.PATH,
+        example = "TOP_ECOSYSTEM_DAPP",
+    )
     @CommonApiResponses
     open fun getBadgeDetail(
         @PathVariable appId: String,
@@ -48,7 +53,12 @@ open class BadgeController(private val service: BadgeApiService) {
     @PutMapping("/apps/{appId}/badges/{badgeType}/visibility")
     @Operation(summary = "Update badge visibility (Published/Unpublished).")
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
-    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
+    @Parameter(
+        name = "badgeType",
+        description = "Badge type",
+        `in` = ParameterIn.PATH,
+        example = "TOP_ECOSYSTEM_DAPP",
+    )
     @CommonApiResponses
     open fun updateBadgeVisibility(
         @PathVariable appId: String,
@@ -62,7 +72,12 @@ open class BadgeController(private val service: BadgeApiService) {
     @GetMapping("/apps/{appId}/badges/{badgeType}/records")
     @Operation(summary = "Get paginated badge award records for a specific badge type.")
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
-    @Parameter(name = "badgeType", description = "Badge type", `in` = ParameterIn.PATH, example = "TOP_ECOSYSTEM_DAPP")
+    @Parameter(
+        name = "badgeType",
+        description = "Badge type",
+        `in` = ParameterIn.PATH,
+        example = "TOP_ECOSYSTEM_DAPP",
+    )
     @CommonApiResponses
     @PaginationParameters
     open fun getBadgeRecords(

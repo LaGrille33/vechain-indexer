@@ -9,12 +9,9 @@ import org.vechain.indexer.VersionedDocument
 
 @Schema(description = "Badge type")
 enum class BadgeType {
-    @Schema(description = "Top Ecosystem DApp")
-    TOP_ECOSYSTEM_DAPP,
-    @Schema(description = "Top Distribution Performer")
-    TOP_DISTRIBUTION_PERFORMER,
-    @Schema(description = "Navigator's Pick")
-    NAVIGATORS_PICK,
+    @Schema(description = "Top Ecosystem DApp") TOP_ECOSYSTEM_DAPP,
+    @Schema(description = "Top Distribution Performer") TOP_DISTRIBUTION_PERFORMER,
+    @Schema(description = "Navigator's Pick") NAVIGATORS_PICK,
 }
 
 @Schema(description = "App badge award record")
@@ -26,7 +23,8 @@ constructor(
     @Schema(description = "Document version") override val version: Int,
     @Schema(description = "Block hash") override val blockId: String,
     @Schema(description = "Block number", example = "15000000") override val blockNumber: Long,
-    @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224") override val blockTimestamp: Long,
+    @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224")
+    override val blockTimestamp: Long,
     @Schema(description = "App ID (bytes32 hex)", example = "0x6d25...77b4") val appId: String,
     @Schema(description = "Badge type") val badgeType: BadgeType,
     @Schema(description = "Scoring round number", example = "1") val round: Long,
@@ -88,5 +86,5 @@ data class BadgeRecord(
 
 @Schema(description = "Badge visibility update request")
 data class BadgeVisibilityRequest(
-    @Schema(description = "Whether to publish", example = "true") val isPublished: Boolean,
+    @Schema(description = "Whether to publish", example = "true") val isPublished: Boolean
 )

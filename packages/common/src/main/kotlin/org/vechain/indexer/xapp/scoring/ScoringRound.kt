@@ -16,12 +16,16 @@ constructor(
     @Schema(description = "Document version") override val version: Int,
     @Schema(description = "Block hash") override val blockId: String,
     @Schema(description = "Block number", example = "15000000") override val blockNumber: Long,
-    @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224") override val blockTimestamp: Long,
+    @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224")
+    override val blockTimestamp: Long,
     @Schema(description = "Round number", example = "1") val round: Long,
-    @Schema(description = "Number of apps in this scoring round", example = "120") val appCount: Long,
-    @Schema(description = "Number of ranked apps (available after finalization)", example = "100") val rankedAppCount: Long?,
+    @Schema(description = "Number of apps in this scoring round", example = "120")
+    val appCount: Long,
+    @Schema(description = "Number of ranked apps (available after finalization)", example = "100")
+    val rankedAppCount: Long?,
     @Schema(description = "Whether finalized", example = "true") val isFinalized: Boolean,
-    @Schema(description = "Whether rankings have been updated", example = "false") val hasRankingsUpdated: Boolean,
+    @Schema(description = "Whether rankings have been updated", example = "false")
+    val hasRankingsUpdated: Boolean,
 ) : VersionedDocument {
     constructor(
         version: Int,
