@@ -1,0 +1,62 @@
+11:57:14.839: [vechain-indexer2] git -c credential.helper= -c core.quotepath=false -c log.showSignature=false checkout HEAD -- packages/api/src/main/kotlin/org/vechain/indexer/xapp/rating/RatingController.kt packages/api/src/main/kotlin/org/vechain/indexer/xapp/review/ReviewVoteStats.kt packages/api/src/main/kotlin/org/vechain/indexer/xapp/review/ReviewController.kt
+11:57:27.990: [vechain-indexer2] git -c credential.helper= -c core.quotepath=false -c log.showSignature=false reset -- error.log response.json
+11:57:28.109: [vechain-indexer2] git -c credential.helper= -c core.quotepath=false -c log.showSignature=false add --ignore-errors -A -f -- packages/api/src/main/kotlin/org/vechain/indexer/config/MongoDbConfig.kt packages/api/src/main/kotlin/org/vechain/indexer/xapp/badge/BadgeApiService.kt packages/common/src/main/kotlin/org/vechain/indexer/xapp/badge/BadgeAward.kt
+11:57:28.201: [vechain-indexer2] git -c credential.helper= -c core.quotepath=false -c log.showSignature=false commit -F C:\Users\Administrator\AppData\Local\Temp\git-commit-msg-.txt --
+Running spotless check: 
+> Task :spotlessInternalRegisterDependencies UP-TO-DATE
+> Task :packages:e2e:spotlessKotlin UP-TO-DATE
+> Task :packages:e2e:spotlessKotlinCheck UP-TO-DATE
+> Task :packages:e2e:spotlessCheck UP-TO-DATE
+> Task :packages:spotlessKotlin UP-TO-DATE
+> Task :packages:spotlessKotlinCheck UP-TO-DATE
+> Task :packages:spotlessCheck UP-TO-DATE
+> Task :spotlessKotlin UP-TO-DATE
+> Task :spotlessKotlinCheck UP-TO-DATE
+> Task :spotlessCheck UP-TO-DATE
+> Task :packages:common:spotlessKotlin UP-TO-DATE
+> Task :packages:api:spotlessKotlin
+> Task :packages:common:spotlessKotlinCheck UP-TO-DATE
+> Task :packages:common:spotlessCheck UP-TO-DATE
+> Task :packages:indexer:spotlessKotlin UP-TO-DATE
+> Task :packages:api:spotlessKotlinCheck FAILED
+> Task :packages:indexer:spotlessKotlinCheck UP-TO-DATE
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':packages:api:spotlessKotlinCheck'.
+> The following files had format violations:
+      src\main\kotlin\org\vechain\indexer\xapp\rating\RatingController.kt
+          @@ -56,6 +56,5 @@
+           ····open·fun·getUserRating(
+           ········@PathVariable·appId:·String,
+           ········@ValidAddress·@PathVariable·wallet:·Address,
+          -····):·AppRating?·=
+          -········service.getUserRating(normalise(appId),·normalise(wallet.value))
+          +····):·AppRating?·=·service.getUserRating(normalise(appId),·normalise(wallet.value))
+           }
+      src\main\kotlin\org\vechain\indexer\xapp\review\ReviewController.kt
+          @@ -123,5 +123,4 @@
+           ············search·=·search,
+           ············pageable·=·toPageable(page,·size,·direction·?:·"desc",·"timestamp"),
+           ········)
+          -
+           }
+      src\main\kotlin\org\vechain\indexer\xapp\review\ReviewVoteStats.kt
+          @@ -59,4 +59,3 @@
+           ····)
+           ····val·myVoteType:·Int,
+           )
+          -
+  Run 'gradlew.bat :packages:api:spotlessApply' to fix these violations.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+BUILD FAILED in 2s
+13 actionable tasks: 2 executed, 11 up-to-date
+\n\n   Spotless check failed. See above for details. To fix the issue: \n\n       ./gradlew spotlessApply \n\n   and then git add/commit again. \n\n
+11:57:32.323: [vechain-indexer2] git -c credential.helper= -c core.quotepath=false -c log.showSignature=false add --ignore-errors -A -f -- error.log response.json
+warning: CRLF will be replaced by LF in error.log.
+The file will have its original line endings in your working directory
+warning: CRLF will be replaced by LF in response.json.
+The file will have its original line endings in your working directory

@@ -123,5 +123,4 @@ open class ReviewController(private val service: ReviewApiService) {
             search = search,
             pageable = toPageable(page, size, direction ?: "desc", "timestamp"),
         )
-
 }

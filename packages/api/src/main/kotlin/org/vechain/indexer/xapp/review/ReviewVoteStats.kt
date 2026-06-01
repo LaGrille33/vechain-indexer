@@ -59,4 +59,3 @@ data class ReviewWithVotes(
     )
     val myVoteType: Int,
 )
-

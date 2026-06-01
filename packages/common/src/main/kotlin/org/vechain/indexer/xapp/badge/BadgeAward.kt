@@ -84,7 +84,7 @@ data class BadgeDetail(
 
 data class BadgeRecord(val round: Long, val rank: Int, val date: Long)
 
-data class BadgeRoundInfo(val round: Long, val rank: Int, val date: String)
+data class BadgeRoundInfo(val round: Long, val rank: Int?, val date: Long)
 
 data class BadgeStatsResponse(
     val totalCount: Int,

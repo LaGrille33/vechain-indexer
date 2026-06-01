@@ -56,6 +56,5 @@ open class RatingController(private val service: RatingApiService) {
     open fun getUserRating(
         @PathVariable appId: String,
         @ValidAddress @PathVariable wallet: Address,
-    ): AppRating? =
-        service.getUserRating(normalise(appId), normalise(wallet.value))
+    ): AppRating? = service.getUserRating(normalise(appId), normalise(wallet.value))
 }
