@@ -12,15 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.vechain.indexer.constants.XAPP_PATH
-import org.vechain.indexer.docs.AddressParameter
 import org.vechain.indexer.docs.AppIdParameter
 import org.vechain.indexer.docs.CommonApiResponses
 import org.vechain.indexer.docs.PaginationParameters
 import org.vechain.indexer.rest.PaginatedResponse
-import org.vechain.indexer.thor.Address
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.utils.PaginationUtils.toPageable
-import org.vechain.indexer.validation.ValidAddress
 import org.vechain.indexer.validation.ValidPageSize
 
 @Profile("b3tr", "xapp-review", "xapp-review-vote")
@@ -29,23 +26,6 @@ import org.vechain.indexer.validation.ValidPageSize
 @RequestMapping(XAPP_PATH)
 @Tag(name = "XApp - Reviews", description = "Query indexed XApp reviews.")
 open class ReviewController(private val service: ReviewApiService) {
-
-    @GetMapping("/apps/{appId}/detail")
-    @Operation(
-        summary = "Get app detail: rating summary.",
-        description = "Returns aggregate rating stats (avg, count, userRating, hasRated).",
-    )
-    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
-    @Parameter(
-        name = "wallet",
-        description = "Current user's wallet address (optional, adds userRating + hasRated)",
-    )
-    @CommonApiResponses
-    open fun getAppDetail(
-        @PathVariable appId: String,
-        @RequestParam(required = false) wallet: String?,
-    ): AppDetailResponse =
-        service.getAppDetail(appId = normalise(appId), wallet = wallet?.let { normalise(it) })
 
     @GetMapping("/apps/{appId}/reviews")
     @Operation(
@@ -144,19 +124,4 @@ open class ReviewController(private val service: ReviewApiService) {
             pageable = toPageable(page, size, direction ?: "desc", "timestamp"),
         )
 
-    @GetMapping("/users/{wallet}/reviews")
-    @Operation(summary = "Get reviews written by a user.")
-    @AddressParameter(name = "wallet", required = true, `in` = ParameterIn.PATH)
-    @CommonApiResponses
-    @PaginationParameters
-    open fun getUserReviews(
-        @ValidAddress @PathVariable wallet: Address,
-        @RequestParam(required = false) page: Int?,
-        @ValidPageSize @RequestParam(required = false) size: Int?,
-        @RequestParam(required = false) direction: String?,
-    ): PaginatedResponse<Review> =
-        service.getUserReviews(
-            author = normalise(wallet.value),
-            pageable = toPageable(page, size, direction, "blockTimestamp"),
-        )
 }

@@ -18,7 +18,6 @@ import org.vechain.indexer.rest.PaginatedResponse
 import org.vechain.indexer.rest.paginatedResponse
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.thor.client.ThorClient
-import org.vechain.indexer.xapp.rating.RatingApiService
 import org.vechain.indexer.xapp.review.repository.ReviewRepository
 import org.vechain.indexer.xapp.review.repository.ReviewVoteRepository
 
@@ -29,7 +28,6 @@ open class ReviewApiService(
     private val reviewVoteRepository: ReviewVoteRepository,
     private val mongoTemplate: MongoTemplate,
     private val domainResolver: VoteDomainResolver?,
-    private val ratingApiService: RatingApiService,
     private val thorClient: ThorClient,
     @Value(
         "\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT:\${XAPP_REVIEW_MANAGER_CONTRACT:0xd369454a6fdca471831ef87f488b1f67418a336a}}"
@@ -112,26 +110,9 @@ open class ReviewApiService(
         )
     }
 
-    /** App detail: rating summary only. */
-    open fun getAppDetail(appId: String, wallet: String?): AppDetailResponse {
-        val ratingSummary = ratingApiService.getAppRatingSummary(appId, wallet)
-        return AppDetailResponse(
-            appId = appId,
-            average = ratingSummary.average,
-            count = ratingSummary.count,
-            userRating = ratingSummary.userRating,
-            hasRated = ratingSummary.hasRated,
-        )
-    }
-
     open fun getReview(reviewId: Long): Review =
         reviewRepository.findByIdOrNull(reviewId.toString())
             ?: throw ResourceNotFoundException("Review not found for id $reviewId")
-
-    open fun getUserReviews(author: String, pageable: Pageable): PaginatedResponse<Review> {
-        val results = reviewRepository.findAllByAuthor(author, pageable)
-        return paginatedResponse(results)
-    }
 
     open fun getVoteStats(reviewId: Long): ReviewVoteStats {
         val aggregation =

@@ -14,12 +14,6 @@ interface ReviewRepository : BaseIndexedRepository<Review, String> {
     @Query("{ 'appId': ?0, 'isHidden': false }")
     fun findAllByAppId(appId: String, pageable: Pageable): Slice<Review>
 
-    @Query("{ 'appId': ?0, 'isHidden': false }", sort = "{'blockTimestamp': -1}")
-    fun findLatestByAppId(appId: String, pageable: Pageable): Slice<Review>
-
-    @Query("{ 'author': ?0 }")
-    fun findAllByAuthor(author: String, pageable: Pageable): Slice<Review>
-
     @Query("{ 'appId': ?0, 'author': ?1 }")
     fun findAllByAppIdAndAuthor(appId: String, author: String, pageable: Pageable): Slice<Review>
 

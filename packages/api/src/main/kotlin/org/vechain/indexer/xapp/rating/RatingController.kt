@@ -15,7 +15,6 @@ import org.vechain.indexer.constants.XAPP_PATH
 import org.vechain.indexer.docs.AddressParameter
 import org.vechain.indexer.docs.AppIdParameter
 import org.vechain.indexer.docs.CommonApiResponses
-import org.vechain.indexer.exception.ResourceNotFoundException
 import org.vechain.indexer.thor.Address
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.validation.ValidAddress
@@ -57,9 +56,6 @@ open class RatingController(private val service: RatingApiService) {
     open fun getUserRating(
         @PathVariable appId: String,
         @ValidAddress @PathVariable wallet: Address,
-    ): AppRating =
+    ): AppRating? =
         service.getUserRating(normalise(appId), normalise(wallet.value))
-            ?: throw ResourceNotFoundException(
-                "No rating found for wallet ${wallet.value} on app $appId"
-            )
 }

@@ -60,13 +60,3 @@ data class ReviewWithVotes(
     val myVoteType: Int,
 )
 
-@Schema(description = "App detail with rating stats")
-data class AppDetailResponse(
-    @Schema(description = "App ID (bytes32 hex)", example = "0x6d25...77b4") val appId: String,
-    @Schema(description = "Average rating, one decimal", example = "4.7") val average: Double,
-    @Schema(description = "Number of raters", example = "128") val count: Long,
-    @Schema(description = "Current user's rating (null if not rated)", example = "4")
-    val userRating: Int?,
-    @Schema(description = "Whether the current user has rated this app", example = "true")
-    val hasRated: Boolean,
-)
