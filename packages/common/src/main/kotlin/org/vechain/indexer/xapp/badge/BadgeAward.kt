@@ -136,6 +136,12 @@ data class BadgeAwardItem(
     @Schema(description = "Rank in this round", example = "3") val rank: Int,
 )
 
+@Schema(description = "Earned badges for an app, grouped by badge type")
+data class AppEarnedBadgesResponse(
+    @Schema(description = "The app ID") val appId: String,
+    @Schema(description = "List of earned badge summaries") val badges: List<BadgeSummary>,
+)
+
 @Schema(description = "Request body for updating badge visibility")
 data class BadgeVisibilityRequest(
     @Schema(description = "Whether the badge should be published", example = "true")

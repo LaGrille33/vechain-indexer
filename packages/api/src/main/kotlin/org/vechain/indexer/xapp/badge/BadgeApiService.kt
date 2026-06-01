@@ -149,5 +149,22 @@ open class BadgeApiService(
         )
     }
 
+    open fun getEarnedBadges(appId: String): AppEarnedBadgesResponse {
+        val allAwards = repository.findAllByAppId(appId)
+        val badges =
+            BadgeType.entries.mapNotNull { type ->
+                val typeAwards = allAwards.filter { it.badgeType == type }
+                if (typeAwards.isEmpty()) return@mapNotNull null
+                BadgeSummary(
+                    badgeType = type,
+                    badgeName = BADGE_NAMES[type] ?: type.name,
+                    isPublished = typeAwards.all { it.isPublished },
+                    totalCount = typeAwards.size,
+                    latestRound = typeAwards.maxOf { it.round },
+                )
+            }
+        return AppEarnedBadgesResponse(appId = appId, badges = badges)
+    }
+
     override fun getLatestIndexedBlocks(): Map<String, Long> = mapOf()
 }
