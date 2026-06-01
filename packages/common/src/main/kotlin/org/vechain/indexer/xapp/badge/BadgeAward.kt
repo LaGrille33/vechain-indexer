@@ -34,6 +34,7 @@ constructor(
     val round: Long,
     val rank: Int,
     val isPublished: Boolean = true,
+    val roundBlockTimestamp: Long? = null,
 ) : VersionedDocument {
     constructor(
         version: Int,
@@ -45,6 +46,7 @@ constructor(
         round: Long,
         rank: Int,
         isPublished: Boolean = true,
+        roundBlockTimestamp: Long? = null,
     ) : this(
         id = "${appId}_${badgeType.value}_$round",
         version = version,
@@ -56,6 +58,7 @@ constructor(
         round = round,
         rank = rank,
         isPublished = isPublished,
+        roundBlockTimestamp = roundBlockTimestamp,
     )
 
     override fun getDocumentId(): String = id

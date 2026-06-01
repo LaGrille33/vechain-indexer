@@ -20,11 +20,15 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.onchain.AppOnchainScore
+import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.xapp.badge.BadgeType
 
 @Service
 @Profile("b3tr", "b3tr-cycle-scoring")
-class CycleScoringService(private val mongoTemplate: MongoTemplate) {
+class CycleScoringService(
+    private val mongoTemplate: MongoTemplate,
+    private val cycleInfoRepository: CycleInfoRepository,
+) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     companion object {
@@ -542,6 +546,7 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
     private fun awardBadges(roundId: Int, sorted: List<ScoredApp>) {
         val badgeCollection = IndexerNames.XAPP_BADGE_AWARD.COLLECTION
         val now = System.currentTimeMillis()
+        val roundBlockTimestamp = cycleInfoRepository.findByRoundId(roundId)?.blockTimestamp
 
         // 1. APP评分徽章 (TOP_ECOSYSTEM_DAPP): top 10% by total score
         awardTopPercentageBadge(
@@ -552,6 +557,7 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
             valueSelector = { it.total.toDouble() },
             allowTieExpansion = true,
             now = now,
+            roundBlockTimestamp = roundBlockTimestamp,
         )
 
         // 2. 高效分发徽章 (TOP_DISTRIBUTION_PERFORMER): top 10% by onchainDistributionScore
@@ -564,6 +570,7 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
             valueSelector = { it.onchainScore?.distributionScore?.toDouble() ?: 0.0 },
             allowTieExpansion = false,
             now = now,
+            roundBlockTimestamp = roundBlockTimestamp,
         )
     }
 
@@ -575,6 +582,7 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
         valueSelector: (ScoredApp) -> Double,
         allowTieExpansion: Boolean,
         now: Long,
+        roundBlockTimestamp: Long?,
     ) {
         if (apps.isEmpty()) return
 
@@ -635,7 +643,8 @@ class CycleScoringService(private val mongoTemplate: MongoTemplate) {
                     .set("badgeType", badgeType.value)
                     .set("round", roundId.toLong())
                     .set("rank", rank)
-                    .set("isPublished", true),
+                    .set("isPublished", true)
+                    .set("roundBlockTimestamp", roundBlockTimestamp),
             )
         }
         bulkOps.execute()
