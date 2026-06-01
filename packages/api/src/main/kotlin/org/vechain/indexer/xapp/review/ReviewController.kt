@@ -93,7 +93,7 @@ open class ReviewController(private val service: ReviewApiService) {
     @Operation(summary = "Get a single review by ID.")
     @Parameter(name = "reviewId", description = "Review ID", `in` = ParameterIn.PATH, example = "6")
     @CommonApiResponses
-    open fun getReview(@PathVariable reviewId: Long): Review = service.getReview(reviewId)
+    open fun getReview(@PathVariable reviewId: Long): ReviewWithVotes = service.getReview(reviewId)
 
     @GetMapping("/reviews/{reviewId}/votes/stats")
     @Operation(summary = "Get aggregated vote statistics for a review.")

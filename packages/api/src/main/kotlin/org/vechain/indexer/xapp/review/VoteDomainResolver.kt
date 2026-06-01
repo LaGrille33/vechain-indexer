@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.vechain.indexer.event.AbiLoader
 import org.vechain.indexer.event.utils.FunctionReturnDecoder
+import org.vechain.indexer.thor.AddressUtils
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.thor.model.BlockRevision
@@ -61,7 +62,7 @@ open class VoteDomainResolver(
                     result[addr] = domain
                 }
             } catch (e: Exception) {
-                logger.warn("Failed to batch-resolve domains: {}", e.message)
+                logger.warn("Failed to batch-resolve domains: {}", e.message, e)
                 for (addr in toResolve) {
                     result.putIfAbsent(addr, null)
                 }
@@ -76,7 +77,13 @@ open class VoteDomainResolver(
             AbiLoader.loadFunctions("abis/vet-domains", listOf("getNames")).firstOrNull()
                 ?: throw IllegalArgumentException("getNames ABI not found")
 
-        val clause = ContractUtils.createClause(resolveUtilsContract, abi, addresses)
+        val bigints = addresses.map { AddressUtils.toBigInt(it) }
+        @Suppress("UNCHECKED_CAST")
+        val addressArray =
+            java.lang.reflect.Array.newInstance(java.math.BigInteger::class.java, bigints.size)
+                as Array<java.math.BigInteger>
+        bigints.forEachIndexed { i, v -> addressArray[i] = v }
+        val clause = ContractUtils.createClause(resolveUtilsContract, abi, addressArray)
 
         val response =
             kotlinx.coroutines
@@ -91,7 +98,7 @@ open class VoteDomainResolver(
         }
 
         val decoded = FunctionReturnDecoder.decode(response.data, abi.outputs)
-        val names = (decoded[""] as? List<*>) ?: emptyList<Any>()
+        val names = (decoded["names"] as? List<*>) ?: (decoded[""] as? List<*>) ?: emptyList<Any>()
 
         return addresses
             .zip(names) { addr, name ->

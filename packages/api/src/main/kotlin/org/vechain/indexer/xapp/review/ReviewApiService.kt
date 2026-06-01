@@ -110,9 +110,19 @@ open class ReviewApiService(
         )
     }
 
-    open fun getReview(reviewId: Long): Review =
-        reviewRepository.findByIdOrNull(reviewId.toString())
-            ?: throw ResourceNotFoundException("Review not found for id $reviewId")
+    open fun getReview(reviewId: Long): ReviewWithVotes {
+        val review =
+            reviewRepository.findByIdOrNull(reviewId.toString())
+                ?: throw ResourceNotFoundException("Review not found for id $reviewId")
+        val stats = batchVoteStats(listOf(review.reviewId))[review.reviewId] ?: zeroStats
+        val domain =
+            try {
+                domainResolver?.resolveDomains(listOf(review.author))?.get(normalise(review.author))
+            } catch (_: Exception) {
+                null
+            }
+        return review.toWithVotes(authorDomain = domain, stats = stats, myVoteType = 0)
+    }
 
     open fun getVoteStats(reviewId: Long): ReviewVoteStats {
         val aggregation =

@@ -24,11 +24,27 @@ data class AppRatingSummary(
     val hasRated: Boolean = false,
 )
 
+@Schema(description = "App rating with domain resolution")
+data class AppRatingDetail(
+    @Schema(description = "MongoDB document ID (<appId>_<rater>)") val id: String,
+    @Schema(description = "Document version") val version: Int,
+    @Schema(description = "Block hash") val blockId: String,
+    @Schema(description = "Block number", example = "15000000") val blockNumber: Long,
+    @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224")
+    val blockTimestamp: Long,
+    @Schema(description = "App ID (bytes32 hex)", example = "0x6d25...77b4") val appId: String,
+    @Schema(description = "Rater wallet address (checksummed)") val rater: String,
+    @Schema(description = "Rater vet domain name (null if not resolved)", example = "alice.vet")
+    val raterDomain: String?,
+    @Schema(description = "Rating (1-5)", example = "4") val rating: Int,
+)
+
 @Profile("b3tr", "xapp-rating", "xapp-review-vote")
 @Service
 open class RatingApiService(
     private val repository: AppRatingRepository,
     private val mongoTemplate: MongoTemplate,
+    private val domainResolver: org.vechain.indexer.xapp.review.VoteDomainResolver?,
 ) : IndexerService {
 
     /** Average rating (1 decimal) and rater count for an app, computed in a single aggregation. */
@@ -73,8 +89,28 @@ open class RatingApiService(
     }
 
     /** The current rating a specific wallet gave an app, or null if they have not rated it. */
-    open fun getUserRating(appId: String, rater: String): AppRating? =
-        repository.findByAppIdAndRater(appId, rater)
+    open fun getUserRating(appId: String, rater: String): AppRatingDetail? {
+        val rating = repository.findByAppIdAndRater(appId, rater) ?: return null
+        val domain =
+            try {
+                domainResolver
+                    ?.resolveDomains(listOf(rating.rater))
+                    ?.get(org.vechain.indexer.thor.HexUtils.normalise(rating.rater))
+            } catch (_: Exception) {
+                null
+            }
+        return AppRatingDetail(
+            id = rating.id,
+            version = rating.version,
+            blockId = rating.blockId,
+            blockNumber = rating.blockNumber,
+            blockTimestamp = rating.blockTimestamp,
+            appId = rating.appId,
+            rater = rating.rater,
+            raterDomain = domain,
+            rating = rating.rating,
+        )
+    }
 
     override fun getLatestIndexedBlocks(): Map<String, Long> = mapOf()
 }
