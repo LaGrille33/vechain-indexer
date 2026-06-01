@@ -97,6 +97,7 @@ open class BadgeApiService(
         val rankByRound = awards.associateBy { it.round }
         val allCycles = cycleInfoRepository.findAll().sortedByDescending { it.roundId }
         return BadgeStatsResponse(
+            badgeType = type,
             totalCount = awards.size,
             latestRound = awards.maxByOrNull { it.round }?.round,
             rounds =

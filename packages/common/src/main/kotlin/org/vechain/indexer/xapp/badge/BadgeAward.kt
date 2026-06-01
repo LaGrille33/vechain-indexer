@@ -114,6 +114,7 @@ data class BadgeRoundInfo(
         "Badge statistics response including total count, latest round, and per-round rankings"
 )
 data class BadgeStatsResponse(
+    @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
     @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
     @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
     @Schema(description = "Acquisition Records") val rounds: List<BadgeRoundInfo>,
