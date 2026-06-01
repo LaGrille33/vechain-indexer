@@ -79,8 +79,6 @@ open class ReviewService(
                         event.params.getReturnValues()["reviewer"]?.toString()?.let {
                             normalise(it)
                         } ?: continue
-                    val rating =
-                        (event.params.getReturnValues()["rating"] as? Number)?.toInt() ?: continue
 
                     val recordId = reviewId.toString()
                     val (existing, nextVersion) = accumulator.resolve(recordId)
@@ -95,7 +93,6 @@ open class ReviewService(
                             reviewId = reviewId,
                             appId = appId,
                             author = author,
-                            rating = rating,
                             title = "",
                             content = "",
                         )
@@ -104,19 +101,18 @@ open class ReviewService(
 
                 "ReviewUpdated" -> {
                     val reviewId = getReviewId(event) ?: continue
-                    val rating =
-                        (event.params.getReturnValues()["rating"] as? Number)?.toInt() ?: continue
 
                     val recordId = reviewId.toString()
                     val (existing, nextVersion) = accumulator.resolve(recordId)
                     val current = existing ?: continue
 
+                    // Title/content are refreshed from the contract in enrichWithContractData; here
+                    // we only bump the version and block metadata so the update is persisted.
                     accumulator.put(
                         recordId,
                         current,
                         current.copy(
                             version = nextVersion,
-                            rating = rating,
                             blockId = event.blockId,
                             blockNumber = event.blockNumber,
                             blockTimestamp = event.blockTimestamp,
@@ -212,7 +208,6 @@ open class ReviewService(
             try {
                 val decoded = FunctionReturnDecoder.decode(response.data, abi.outputs)
                 val inner = (decoded[""] as? Map<*, *>) ?: decoded
-                val rating = (inner["rating"] as? Number)?.toInt() ?: review.rating
                 val title = (inner["title"] as? String) ?: review.title
                 val content = (inner["content"] as? String) ?: review.content
                 val upvotes = (inner["upvotes"] as? Number)?.toLong() ?: review.upvotes
@@ -220,7 +215,6 @@ open class ReviewService(
                 val reports = (inner["reports"] as? Number)?.toLong() ?: review.reports
                 val hidden = (inner["hidden"] as? Boolean) ?: review.isHidden
                 review.copy(
-                    rating = rating,
                     title = title,
                     content = content,
                     upvotes = upvotes,

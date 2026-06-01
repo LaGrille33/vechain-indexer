@@ -41,7 +41,6 @@ constructor(
         example = "0x4F064B42dD4583754cd1E2D21C8FeF2786CbD4a9",
     )
     val author: String,
-    @Schema(description = "Rating (1-5)", example = "4") val rating: Int,
     @Schema(description = "Review title", example = "Great app") val title: String,
     @Schema(description = "Review content", example = "Really good experience using this app.")
     val content: String,
@@ -59,7 +58,6 @@ constructor(
         reviewId: Long,
         appId: String,
         author: String,
-        rating: Int,
         title: String,
         content: String,
         upvotes: Long = 0,
@@ -75,7 +73,6 @@ constructor(
         reviewId = reviewId,
         appId = appId,
         author = author,
-        rating = rating,
         title = title,
         content = content,
         upvotes = upvotes,

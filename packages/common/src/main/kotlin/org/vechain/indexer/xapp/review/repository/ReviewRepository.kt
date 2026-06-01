@@ -22,4 +22,24 @@ interface ReviewRepository : BaseIndexedRepository<Review, String> {
 
     @Query("{ 'appId': ?0, 'author': ?1 }")
     fun findAllByAppIdAndAuthor(appId: String, author: String, pageable: Pageable): Slice<Review>
+
+    /** Returns non-hidden reviews for the app, plus hidden reviews authored by [viewer]. */
+    @Query("{ 'appId': ?0, '\$or': [ { 'isHidden': false }, { 'author': ?1 } ] }")
+    fun findAllByAppIdWithViewerHidden(
+        appId: String,
+        viewer: String,
+        pageable: Pageable,
+    ): Slice<Review>
+
+    /**
+     * Returns non-hidden reviews by [author] for the app, plus hidden reviews if [viewer] is the
+     * author.
+     */
+    @Query("{ 'appId': ?0, 'author': ?1, '\$or': [ { 'isHidden': false }, { 'author': ?2 } ] }")
+    fun findAllByAppIdAndAuthorWithViewerHidden(
+        appId: String,
+        author: String,
+        viewer: String,
+        pageable: Pageable,
+    ): Slice<Review>
 }

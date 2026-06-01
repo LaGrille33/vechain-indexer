@@ -23,15 +23,38 @@ import org.vechain.indexer.utils.PaginationUtils.toPageable
 import org.vechain.indexer.validation.ValidAddress
 import org.vechain.indexer.validation.ValidPageSize
 
-@Profile("b3tr", "xapp-review")
+@Profile("b3tr", "xapp-review", "xapp-review-vote")
 @Validated
 @RestController
 @RequestMapping(XAPP_PATH)
 @Tag(name = "XApp - Reviews", description = "Query indexed XApp reviews.")
 open class ReviewController(private val service: ReviewApiService) {
 
+    @GetMapping("/apps/{appId}/detail")
+    @Operation(
+        summary = "Get app detail: rating summary.",
+        description = "Returns aggregate rating stats (avg, count, userRating, hasRated).",
+    )
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @Parameter(
+        name = "wallet",
+        description = "Current user's wallet address (optional, adds userRating + hasRated)",
+    )
+    @CommonApiResponses
+    open fun getAppDetail(
+        @PathVariable appId: String,
+        @RequestParam(required = false) wallet: String?,
+    ): AppDetailResponse =
+        service.getAppDetail(appId = normalise(appId), wallet = wallet?.let { normalise(it) })
+
     @GetMapping("/apps/{appId}/reviews")
-    @Operation(summary = "Get reviews for an app.")
+    @Operation(
+        summary = "Get reviews for an app with vote stats and user context.",
+        description =
+            "Returns reviews enriched with vote percentages, author domain, and current user's vote. " +
+                "Hidden reviews are included if the viewer is the author. " +
+                "Sort options: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews.",
+    )
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
     @Parameter(
         name = "sortBy",
@@ -43,14 +66,16 @@ open class ReviewController(private val service: ReviewApiService) {
     @PaginationParameters
     open fun getAppReviews(
         @PathVariable appId: String,
+        @RequestParam(required = false) wallet: String?,
         @RequestParam(required = false) page: Int?,
         @ValidPageSize @RequestParam(required = false) size: Int?,
         @RequestParam(required = false) direction: String?,
         @RequestParam(required = false) sortBy: String?,
         @RequestParam(required = false) author: String?,
-    ): PaginatedResponse<Review> {
+    ): PaginatedResponse<ReviewWithVotes> {
+        val normalizedSort = sortBy?.lowercase()
         val sortFields =
-            when (sortBy?.lowercase()) {
+            when (normalizedSort) {
                 "upvotes",
                 "most_upvotes" -> arrayOf("upvotes", "blockTimestamp")
                 "downvotes",
@@ -61,16 +86,15 @@ open class ReviewController(private val service: ReviewApiService) {
             }
         val finalDirection =
             if (
-                sortBy != null &&
-                    sortBy.lowercase() in
-                        setOf(
-                            "upvotes",
-                            "most_upvotes",
-                            "downvotes",
-                            "most_downvotes",
-                            "reports",
-                            "most_reports",
-                        )
+                normalizedSort in
+                    setOf(
+                        "upvotes",
+                        "most_upvotes",
+                        "downvotes",
+                        "most_downvotes",
+                        "reports",
+                        "most_reports",
+                    )
             ) {
                 "desc"
             } else {
@@ -79,6 +103,8 @@ open class ReviewController(private val service: ReviewApiService) {
         return service.getAppReviews(
             appId = normalise(appId),
             author = author?.let { normalise(it) },
+            viewer = wallet?.let { normalise(it) },
+            sortBy = normalizedSort,
             pageable = toPageable(page, size, finalDirection, *sortFields),
         )
     }
@@ -89,10 +115,20 @@ open class ReviewController(private val service: ReviewApiService) {
     @CommonApiResponses
     open fun getReview(@PathVariable reviewId: Long): Review = service.getReview(reviewId)
 
-    @GetMapping("/reviews/{reviewId}/votes")
-    @Operation(summary = "Get vote history for a review.")
+    @GetMapping("/reviews/{reviewId}/votes/stats")
+    @Operation(summary = "Get aggregated vote statistics for a review.")
     @Parameter(name = "reviewId", description = "Review ID", `in` = ParameterIn.PATH, example = "6")
-    @Parameter(name = "search", description = "Search by voter address")
+    @CommonApiResponses
+    open fun getVoteStats(@PathVariable reviewId: Long): ReviewVoteStats =
+        service.getVoteStats(reviewId)
+
+    @GetMapping("/reviews/{reviewId}/votes")
+    @Operation(summary = "Get paginated vote history for a review.")
+    @Parameter(name = "reviewId", description = "Review ID", `in` = ParameterIn.PATH, example = "6")
+    @Parameter(
+        name = "search",
+        description = "Search by voter address or domain name (e.g. '0x123...' or 'jun.vet')",
+    )
     @CommonApiResponses
     @PaginationParameters
     open fun getReviewVotes(
@@ -101,7 +137,7 @@ open class ReviewController(private val service: ReviewApiService) {
         @RequestParam(required = false) page: Int?,
         @ValidPageSize @RequestParam(required = false) size: Int?,
         @RequestParam(required = false) direction: String?,
-    ): PaginatedResponse<ReviewVote> =
+    ): PaginatedResponse<ReviewVoteDetail> =
         service.getReviewVotes(
             reviewId = reviewId,
             search = search,
