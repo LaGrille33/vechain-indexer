@@ -94,4 +94,13 @@ open class BadgeController(private val service: BadgeApiService) {
     @CommonApiResponses
     open fun getPublicBadges(@PathVariable appId: String): List<BadgeAward> =
         service.getPublicBadges(appId)
+
+    @GetMapping("/apps/{appId}/badges/previousRound")
+    @Operation(summary = "Get the badges and rankings for an app in the previous round.")
+    @CommonApiResponses
+    open fun getPreviousRoundBadges(
+        @Parameter(description = "The unique identifier of the app.", required = true)
+        @PathVariable
+        appId: String
+    ): AppPreviousRoundBadgeResponse = service.getPreviousRoundBadges(appId)
 }

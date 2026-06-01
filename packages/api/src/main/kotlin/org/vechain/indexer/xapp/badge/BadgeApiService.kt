@@ -118,5 +118,36 @@ open class BadgeApiService(
         return allPublic.filter { it.round == latestRound }
     }
 
+    open fun getPreviousRoundBadges(appId: String): AppPreviousRoundBadgeResponse {
+        val currentCycle =
+            cycleInfoRepository.findTopByOrderByRoundIdDesc()
+                ?: throw NoSuchElementException("No cycle info found")
+        val previousRound = currentCycle.roundId - 1
+        if (previousRound < 1) {
+            return AppPreviousRoundBadgeResponse(
+                appId = appId,
+                round = previousRound,
+                roundTimestamp = null,
+                badges = emptyList(),
+            )
+        }
+        val previousCycle = cycleInfoRepository.findByRoundId(previousRound)
+        val awards = repository.findAllByAppId(appId).filter { it.round == previousRound.toLong() }
+        val badgeItems =
+            awards.map { award ->
+                BadgeAwardItem(
+                    badgeType = award.badgeType,
+                    badgeName = BADGE_NAMES[award.badgeType] ?: award.badgeType.name,
+                    rank = award.rank,
+                )
+            }
+        return AppPreviousRoundBadgeResponse(
+            appId = appId,
+            round = previousRound,
+            roundTimestamp = previousCycle?.blockTimestamp,
+            badges = badgeItems,
+        )
+    }
+
     override fun getLatestIndexedBlocks(): Map<String, Long> = mapOf()
 }

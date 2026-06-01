@@ -120,6 +120,22 @@ data class BadgeStatsResponse(
     @Schema(description = "Acquisition Records") val rounds: List<BadgeRoundInfo>,
 )
 
+@Schema(description = "Badge awards for an app in the previous round")
+data class AppPreviousRoundBadgeResponse(
+    @Schema(description = "The app ID") val appId: String,
+    @Schema(description = "Previous round number") val round: Int,
+    @Schema(description = "Previous round timestamp (Unix seconds)") val roundTimestamp: Long?,
+    @Schema(description = "List of badges earned in this round") val badges: List<BadgeAwardItem>,
+)
+
+@Schema(description = "A single badge award item with rank")
+data class BadgeAwardItem(
+    @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
+    @Schema(description = "Badge display name", example = "Top Ecosystem DApp")
+    val badgeName: String,
+    @Schema(description = "Rank in this round", example = "3") val rank: Int,
+)
+
 @Schema(description = "Request body for updating badge visibility")
 data class BadgeVisibilityRequest(
     @Schema(description = "Whether the badge should be published", example = "true")
