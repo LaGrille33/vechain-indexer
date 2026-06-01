@@ -115,4 +115,25 @@ open class BadgeController(private val service: BadgeApiService) {
         @PathVariable
         appId: String
     ): AppPreviousRoundBadgeResponse = service.getPreviousRoundBadges(appId)
+
+    @GetMapping("/apps/{appId}/badges/roundRank")
+    @Operation(
+        summary = "Get badge rank for a specific round, along with total count and latest round."
+    )
+    @CommonApiResponses
+    open fun getBadgeRoundRank(
+        @Parameter(description = "The unique identifier of the app.", required = true)
+        @PathVariable
+        appId: String,
+        @Parameter(
+            description =
+                "The type of badge to query. Allowed values: topEcosystemDapp, topDistributionPerformer, navigatorsPick.",
+            required = true,
+        )
+        @RequestParam
+        badgeType: String,
+        @Parameter(description = "The round number to query.", required = true, example = "5")
+        @RequestParam
+        round: Long,
+    ): BadgeRoundRankResponse = service.getBadgeRoundRank(appId, badgeType, round)
 }

@@ -142,6 +142,21 @@ data class AppEarnedBadgesResponse(
     @Schema(description = "List of earned badge summaries") val badges: List<BadgeSummary>,
 )
 
+@Schema(description = "Badge rank info for a specific round with summary stats")
+data class BadgeRoundRankResponse(
+    @Schema(description = "The app ID") val appId: String,
+    @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
+    @Schema(description = "The queried round number", example = "5") val round: Long,
+    @Schema(description = "Rank in this round, null if not awarded", example = "3") val rank: Int?,
+    @Schema(description = "Total number of times this app has earned this badge", example = "12")
+    val totalCount: Long,
+    @Schema(
+        description = "The latest round in which this app earned this badge, null if never awarded",
+        example = "15",
+    )
+    val latestRound: Long?,
+)
+
 @Schema(description = "Request body for updating badge visibility")
 data class BadgeVisibilityRequest(
     @Schema(description = "Whether the badge should be published", example = "true")

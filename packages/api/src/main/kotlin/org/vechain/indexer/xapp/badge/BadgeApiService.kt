@@ -166,5 +166,25 @@ open class BadgeApiService(
         return AppEarnedBadgesResponse(appId = appId, badges = badges)
     }
 
+    open fun getBadgeRoundRank(
+        appId: String,
+        badgeType: String,
+        round: Long,
+    ): BadgeRoundRankResponse {
+        val type = BadgeType.fromValue(badgeType)
+        val totalCount = repository.countByAppIdAndBadgeType(appId, type)
+        val latestAward = repository.findTopByAppIdAndBadgeTypeOrderByRoundDesc(appId, type)
+        val targetAwards = repository.findAllByAppIdAndBadgeType(appId, type)
+        val rank = targetAwards.find { it.round == round }?.rank
+        return BadgeRoundRankResponse(
+            appId = appId,
+            badgeType = type,
+            round = round,
+            rank = rank,
+            totalCount = totalCount,
+            latestRound = latestAward?.round,
+        )
+    }
+
     override fun getLatestIndexedBlocks(): Map<String, Long> = mapOf()
 }
