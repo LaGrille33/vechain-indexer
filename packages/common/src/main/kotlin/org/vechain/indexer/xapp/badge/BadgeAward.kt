@@ -72,10 +72,8 @@ data class BadgeSummary(
     val badgeName: String,
     @Schema(description = "Whether the badge is published", example = "true")
     val isPublished: Boolean,
-    @Schema(description = "Total number of times this badge has been awarded", example = "5")
-    val totalCount: Int,
-    @Schema(description = "Latest round number, null if never awarded", example = "12")
-    val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
+    @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
 )
 
 @Schema(description = "Detailed information for a specific badge type")
@@ -87,10 +85,8 @@ data class BadgeDetail(
     val isPublished: Boolean,
     @Schema(description = "Description of the badge", example = "Awarded to top ecosystem dApps")
     val description: String,
-    @Schema(description = "Total number of times this badge has been awarded", example = "5")
-    val totalCount: Int,
-    @Schema(description = "Latest round number, null if never awarded", example = "12")
-    val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
+    @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
     @Schema(description = "List of award records") val records: List<BadgeRecord>,
 )
 
@@ -140,6 +136,16 @@ data class BadgeAwardItem(
 data class AppEarnedBadgesResponse(
     @Schema(description = "The app ID") val appId: String,
     @Schema(description = "List of earned badge summaries") val badges: List<BadgeSummary>,
+)
+
+@Schema(description = "Badge rank info for a specific round with summary stats")
+data class BadgeRoundRankResponse(
+    @Schema(description = "The app ID") val appId: String,
+    @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
+    @Schema(description = "The queried round number", example = "5") val round: Long,
+    @Schema(description = "Rank in this round, null if not awarded", example = "3") val rank: Int?,
+    @Schema(description = "Total Badges Earned", example = "12") val totalCount: Long,
+    @Schema(description = "Latest Badges", example = "15") val latestRound: Long?,
 )
 
 @Schema(description = "Request body for updating badge visibility")
