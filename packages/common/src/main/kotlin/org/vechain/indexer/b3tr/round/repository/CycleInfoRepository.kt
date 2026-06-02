@@ -8,5 +8,7 @@ interface CycleInfoRepository : MongoRepository<CycleInfo, String> {
 
     fun findByRoundId(roundId: Int): CycleInfo?
 
+    fun findAllByRoundIdIn(roundIds: List<Int>): List<CycleInfo>
+
     fun findByRoundIdIn(roundIds: List<Int>): List<CycleInfo>
 }

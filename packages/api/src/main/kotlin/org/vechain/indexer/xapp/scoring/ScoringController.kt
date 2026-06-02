@@ -41,4 +41,11 @@ open class ScoringController(private val service: ScoringApiService) {
     @Parameter(name = "round", description = "Round number", `in` = ParameterIn.PATH, example = "1")
     @CommonApiResponses
     open fun getRound(@PathVariable round: Long): ScoringRound = service.getRound(round)
+
+    @GetMapping("/apps/{appId}/scores/previousRound")
+    @Operation(summary = "Get app score, rank, round date for the previous round.")
+    @CommonApiResponses
+    open fun getAppPreviousScore(
+        @Parameter(description = "App identifier", required = true) @PathVariable appId: String
+    ): AppPreviousScoreResponse = service.getAppPreviousScore(appId)
 }

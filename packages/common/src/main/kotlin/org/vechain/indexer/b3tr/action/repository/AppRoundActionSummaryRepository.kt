@@ -61,4 +61,8 @@ interface AppRoundActionSummaryRepository : BaseIndexedRepository<AppRoundAction
         appId: String,
         roundId: Int,
     ): Long
+
+    @Cacheable(value = ["app_round_countByAppId"], key = "#appId")
+    @Query(value = "{ 'appId': ?0 }", count = true)
+    fun countByAppId(appId: String): Long
 }

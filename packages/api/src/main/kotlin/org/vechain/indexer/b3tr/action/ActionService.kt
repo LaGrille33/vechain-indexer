@@ -3,6 +3,7 @@ package org.vechain.indexer.b3tr.action
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Profile
@@ -15,11 +16,17 @@ import org.vechain.indexer.b3tr.action.repository.UserAllTimeActionSummaryReposi
 import org.vechain.indexer.b3tr.action.repository.UserDailyActionSummaryRepository
 import org.vechain.indexer.b3tr.action.repository.UserRoundActionSummaryRepository
 import org.vechain.indexer.b3tr.action.response.AppOverview
+import org.vechain.indexer.b3tr.action.response.AppRoundUserStatsResponse
+import org.vechain.indexer.b3tr.action.response.AppUserCountResponse
 import org.vechain.indexer.b3tr.action.response.GlobalOverview
+import org.vechain.indexer.b3tr.action.response.RoundUserStats
 import org.vechain.indexer.b3tr.action.response.UserAppOverview
 import org.vechain.indexer.b3tr.action.response.UserOverview
+import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.b3tr.shared.EntityType
+import org.vechain.indexer.b3tr.userfirstseen.UserFirstSeenRepository
 import org.vechain.indexer.exception.BadRequestException
+import org.vechain.indexer.exception.ResourceNotFoundException
 import org.vechain.indexer.history.HistoryEventName
 import org.vechain.indexer.history.HistoryRepository
 import org.vechain.indexer.rest.PaginatedResponse
@@ -38,6 +45,8 @@ open class ActionService(
     private val appAllTimeRepo: AppAllTimeActionSummaryRepository,
     private val appDailyRepo: AppDailyActionSummaryRepository,
     private val appRoundRepo: AppRoundActionSummaryRepository,
+    private val cycleInfoRepo: CycleInfoRepository,
+    private val userFirstSeenRepo: UserFirstSeenRepository,
     @Qualifier("queryDispatcher") private val queryDispatcher: CoroutineDispatcher,
 ) {
     // User Actions
@@ -482,6 +491,51 @@ open class ActionService(
             rankByReward = rankByReward,
             rankByActionsRewarded = rankByActionsRewarded,
         )
+    }
+
+    fun getTotalUserCountByAppId(appId: AppId): AppUserCountResponse {
+        val count = appRoundRepo.countByAppId(appId.value)
+        return AppUserCountResponse(appId = appId.value, totalUserCount = count)
+    }
+
+    open fun getAppRoundUserStats(appId: AppId, roundRange: RoundRange): AppRoundUserStatsResponse {
+        val currentCycle =
+            cycleInfoRepo.findTopByOrderByRoundIdDesc()
+                ?: throw ResourceNotFoundException("No cycle info found")
+        val previousRound = currentCycle.roundId - 1
+        val toRound = previousRound
+        val fromRound =
+            when (roundRange) {
+                RoundRange.THREE_M -> previousRound - 12
+                RoundRange.SIX_M -> previousRound - 25
+                RoundRange.ONE_Y -> previousRound - 51
+                RoundRange.ALL -> 1
+            }
+        val safeFromRound = maxOf(1, fromRound)
+        val rounds = (safeFromRound..toRound).toList().sortedDescending()
+
+        val cycleInfoMap = cycleInfoRepo.findAllByRoundIdIn(rounds).associateBy { it.roundId }
+
+        val datas = runBlocking {
+            rounds
+                .map { round ->
+                    async(queryDispatcher) {
+                        val activeUsers = appRoundRepo.countByAppIdAndRoundId(appId.value, round)
+                        val newUsers =
+                            userFirstSeenRepo.countByAppIdAndFirstRoundId(appId.value, round)
+                        val roundDate = cycleInfoMap[round]?.blockTimestamp ?: 0L
+                        RoundUserStats(
+                            round = round,
+                            roundDate = roundDate,
+                            activeUsers = activeUsers,
+                            newUsers = newUsers,
+                        )
+                    }
+                }
+                .awaitAll()
+        }
+
+        return AppRoundUserStatsResponse(appId = appId.value, datas = datas)
     }
 
     // App Overviews
