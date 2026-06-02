@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.vechain.indexer.b3tr.AppId
 import org.vechain.indexer.b3tr.action.response.AppOverview
+import org.vechain.indexer.b3tr.action.response.AppRoundUserStatsResponse
 import org.vechain.indexer.b3tr.action.response.AppUserCountResponse
 import org.vechain.indexer.b3tr.action.response.ERROR_CANT_PASS_ROUND_AND_DATE
 import org.vechain.indexer.b3tr.action.response.GlobalOverview
@@ -27,6 +28,7 @@ import org.vechain.indexer.docs.DateParameter
 import org.vechain.indexer.docs.EndDateParameter
 import org.vechain.indexer.docs.PaginationParameters
 import org.vechain.indexer.docs.RoundIdParameter
+import org.vechain.indexer.docs.RoundRangeParameter
 import org.vechain.indexer.docs.StartDateParameter
 import org.vechain.indexer.exception.BadRequestException
 import org.vechain.indexer.rest.PaginatedResponse
@@ -37,6 +39,7 @@ import org.vechain.indexer.validation.ValidISODateString
 import org.vechain.indexer.validation.ValidNonNegativeLong
 import org.vechain.indexer.validation.ValidPageNumber
 import org.vechain.indexer.validation.ValidPageSize
+import org.vechain.indexer.validation.ValidRoundRange
 
 @Profile("b3tr", "b3tr-actions")
 @Tag(name = "B3TR - Actions", description = "Endpoints for B3TR Actions.")
@@ -256,6 +259,29 @@ open class ActionController(private val service: ActionService) {
     @CommonApiResponses
     open fun getAppUserCount(@ValidAppId @PathVariable appId: AppId): AppUserCountResponse {
         return service.getTotalUserCountByAppId(appId)
+    }
+
+    @GetMapping("/actions/apps/{appId}/roundUserStats")
+    @Operation(
+        summary = "Get per-round active and new user statistics for a specific app",
+        description =
+            """
+            Returns activeUsers and newUsers for each round within the specified range.
+            - 3M: last 13 rounds (including previous round)
+            - 6M: last 26 rounds (including previous round)
+            - 1Y: last 52 rounds (including previous round)
+            - ALL: all rounds up to and including the previous round
+        """,
+    )
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @RoundRangeParameter
+    @CommonApiResponses
+    open fun getAppRoundUserStats(
+        @ValidAppId @PathVariable appId: AppId,
+        @ValidRoundRange @RequestParam range: String,
+    ): AppRoundUserStatsResponse {
+        val roundRange = RoundRange.fromPathValue(range)
+        return service.getAppRoundUserStats(appId, roundRange)
     }
 
     @GetMapping("/actions/global/overview")
