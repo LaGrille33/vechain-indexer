@@ -44,6 +44,10 @@ open class ScoringApiService(
                     score = null,
                     rank = null,
                     roundDate = previousCycle?.blockTimestamp,
+                    distribution = null,
+                    activity = null,
+                    community = null,
+                    health = null,
                 )
         val rank =
             appCycleScoreRepository.countByRoundIdAndTotalGreaterThan(score.roundId, score.total) +
@@ -54,6 +58,10 @@ open class ScoringApiService(
             score = score.total,
             rank = rank,
             roundDate = previousCycle?.blockTimestamp,
+            distribution = score.breakdownDistribution,
+            activity = score.breakdownActivity,
+            community = score.breakdownCommunityTeam,
+            health = score.breakdownHealth,
         )
     }
 
@@ -66,5 +74,11 @@ data class AppPreviousScoreResponse(
     @Schema(description = "Round number", example = "5") val round: Long,
     @Schema(description = "App Score", example = "85") val score: Int?,
     @Schema(description = "Ranking", example = "3") val rank: Int?,
-    @Schema(description = "Round date", example = "1779424224") val roundDate: Long?,
+    @Schema(description = "Round date (Unix timestamp)", example = "1779424224")
+    val roundDate: Long?,
+    @Schema(description = "Distribution dimension score (0-20)", example = "15")
+    val distribution: Int?,
+    @Schema(description = "Activity dimension score (0-20)", example = "12") val activity: Int?,
+    @Schema(description = "Community dimension score (0-20)", example = "18") val community: Int?,
+    @Schema(description = "Health dimension score (0-20)", example = "14") val health: Int?,
 )
