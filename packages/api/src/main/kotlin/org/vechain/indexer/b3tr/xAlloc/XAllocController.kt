@@ -1,7 +1,9 @@
 package org.vechain.indexer.b3tr.xAlloc
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.enums.ParameterIn
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpStatus
@@ -81,5 +83,28 @@ open class XAllocController(private val xAllocService: XAllocService) {
                 xAllocService.getXAllocEarningsByRoundId(roundId!!)
             }
         }
+    }
+
+    @GetMapping("distribution-performance")
+    @Operation(
+        summary = "Get distribution performance for an app",
+        description =
+            "Returns distribution performance metrics for a specific app, showing how much of " +
+                "the allocated rewards were actually distributed. Optionally filter by range " +
+                "(3M=13 rounds, 6M=26 rounds, 1Y=52 rounds, All=no limit).",
+    )
+    @AppIdParameter(required = true)
+    @CommonApiResponses
+    open fun getDistributionPerformance(
+        @RequestParam appId: String,
+        @Parameter(
+            description =
+                "Time range filter. 3M=last 13 rounds, 6M=last 26 rounds, 1Y=last 52 rounds, All=no limit.",
+            schema = Schema(allowableValues = ["3M", "6M", "1Y", "All"]),
+        )
+        @RequestParam(required = false)
+        range: String?,
+    ): List<DistributionPerformanceItem> {
+        return xAllocService.getDistributionPerformance(appId, range)
     }
 }
