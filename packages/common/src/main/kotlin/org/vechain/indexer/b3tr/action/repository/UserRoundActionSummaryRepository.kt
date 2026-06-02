@@ -28,6 +28,13 @@ interface UserRoundActionSummaryRepository : BaseIndexedRepository<UserRoundActi
     @Query("{ 'entity': ?0, 'roundId': ?1 }")
     fun findByEntityAndRoundId(entity: String, roundId: Int): UserRoundActionSummary?
 
+    @Query("{ 'entity': ?0, 'entityType': ?1, 'roundId': { '\$in': ?2 } }")
+    fun findAllByEntityAndEntityTypeAndRoundIdIn(
+        entity: String,
+        entityType: EntityType,
+        roundIds: List<Int>,
+    ): List<UserRoundActionSummary>
+
     // Count entries where totalRewardAmount is greater than a specific value, filtering by entity
     // type and round ID
     @Cacheable(
