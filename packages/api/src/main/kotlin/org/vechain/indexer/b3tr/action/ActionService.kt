@@ -15,6 +15,7 @@ import org.vechain.indexer.b3tr.action.repository.UserAllTimeActionSummaryReposi
 import org.vechain.indexer.b3tr.action.repository.UserDailyActionSummaryRepository
 import org.vechain.indexer.b3tr.action.repository.UserRoundActionSummaryRepository
 import org.vechain.indexer.b3tr.action.response.AppOverview
+import org.vechain.indexer.b3tr.action.response.AppUserCountResponse
 import org.vechain.indexer.b3tr.action.response.GlobalOverview
 import org.vechain.indexer.b3tr.action.response.UserAppOverview
 import org.vechain.indexer.b3tr.action.response.UserOverview
@@ -482,6 +483,11 @@ open class ActionService(
             rankByReward = rankByReward,
             rankByActionsRewarded = rankByActionsRewarded,
         )
+    }
+
+    fun getTotalUserCountByAppId(appId: AppId): AppUserCountResponse {
+        val count = appRoundRepo.countByAppId(appId.value)
+        return AppUserCountResponse(appId = appId.value, totalUserCount = count)
     }
 
     // App Overviews

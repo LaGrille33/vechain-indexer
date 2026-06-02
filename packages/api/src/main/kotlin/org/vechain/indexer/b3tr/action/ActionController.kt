@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.vechain.indexer.b3tr.AppId
 import org.vechain.indexer.b3tr.action.response.AppOverview
+import org.vechain.indexer.b3tr.action.response.AppUserCountResponse
 import org.vechain.indexer.b3tr.action.response.ERROR_CANT_PASS_ROUND_AND_DATE
 import org.vechain.indexer.b3tr.action.response.GlobalOverview
 import org.vechain.indexer.b3tr.action.response.UserAppOverview
@@ -247,6 +248,14 @@ open class ActionController(private val service: ActionService) {
         }
 
         return service.getAppAllTimeOverview(appId)
+    }
+
+    @GetMapping("/actions/apps/{appId}/userCount")
+    @Operation(summary = "Get total user count for a specific app")
+    @AppIdParameter(required = true, `in` = ParameterIn.PATH)
+    @CommonApiResponses
+    open fun getAppUserCount(@ValidAppId @PathVariable appId: AppId): AppUserCountResponse {
+        return service.getTotalUserCountByAppId(appId)
     }
 
     @GetMapping("/actions/global/overview")
