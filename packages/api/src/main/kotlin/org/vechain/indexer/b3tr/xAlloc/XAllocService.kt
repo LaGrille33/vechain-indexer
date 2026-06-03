@@ -3,6 +3,7 @@ package org.vechain.indexer.b3tr.xAlloc
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerService
+import org.vechain.indexer.b3tr.action.repository.UserAllTimeActionSummaryRepository
 import org.vechain.indexer.b3tr.action.repository.UserRoundActionSummaryRepository
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.b3tr.shared.EntityType
@@ -21,6 +22,7 @@ private fun java.math.BigDecimal.clean(): java.math.BigDecimal {
 open class XAllocService(
     private val xAllocResultRepository: XAllocResultRepository,
     private val userRoundRepo: UserRoundActionSummaryRepository,
+    private val userAllTimeRepo: UserAllTimeActionSummaryRepository,
     private val cycleInfoRepo: CycleInfoRepository,
 ) : IndexerService {
 
@@ -147,5 +149,59 @@ open class XAllocService(
                 distributionPerformance = performance,
             )
         }
+    }
+
+    open fun getRewardDetails(appId: String): RewardDetailsResponse {
+        val allEarnings = xAllocResultRepository.findByAppId(appId)
+        val totalRounds = allEarnings.map { it.roundId }.distinct().size
+
+        val totalAllocationEarnings =
+            allEarnings
+                .fold(java.math.BigDecimal.ZERO) { acc, r ->
+                    acc + (r.totalAmount ?: java.math.BigDecimal.ZERO)
+                }
+                .clean()
+
+        val overview = userAllTimeRepo.findByEntity(appId)
+        val totalDistributed = (overview?.totalRewardAmount ?: java.math.BigDecimal.ZERO).clean()
+        val actionsRewarded = overview?.actionsRewarded ?: 0
+
+        val averageAllocationPerRound =
+            if (totalRounds > 0) {
+                totalAllocationEarnings
+                    .divide(java.math.BigDecimal(totalRounds), 10, java.math.RoundingMode.HALF_UP)
+                    .clean()
+            } else {
+                java.math.BigDecimal.ZERO
+            }
+
+        val averageDistributionPerRound =
+            if (totalRounds > 0) {
+                totalDistributed
+                    .divide(java.math.BigDecimal(totalRounds), 10, java.math.RoundingMode.HALF_UP)
+                    .clean()
+            } else {
+                java.math.BigDecimal.ZERO
+            }
+
+        val totalDistributionPerformance =
+            if (totalAllocationEarnings > java.math.BigDecimal.ZERO) {
+                totalDistributed
+                    .divide(totalAllocationEarnings, 10, java.math.RoundingMode.HALF_UP)
+                    .multiply(java.math.BigDecimal(100))
+                    .setScale(2, java.math.RoundingMode.HALF_UP)
+            } else {
+                java.math.BigDecimal.ZERO
+            }
+
+        return RewardDetailsResponse(
+            totalAllocationEarnings = totalAllocationEarnings,
+            averageAllocationPerRound = averageAllocationPerRound,
+            totalRounds = totalRounds,
+            totalDistributionPerformance = totalDistributionPerformance,
+            totalDistributed = totalDistributed,
+            averageDistributionPerRound = averageDistributionPerRound,
+            actionsRewarded = actionsRewarded,
+        )
     }
 }

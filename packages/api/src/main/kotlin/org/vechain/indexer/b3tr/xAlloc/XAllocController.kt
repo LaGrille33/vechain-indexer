@@ -107,4 +107,17 @@ open class XAllocController(private val xAllocService: XAllocService) {
     ): List<DistributionPerformanceItem> {
         return xAllocService.getDistributionPerformance(appId, range)
     }
+
+    @GetMapping("reward-details")
+    @Operation(
+        summary = "Get reward details for an app",
+        description =
+            "Returns aggregated reward details including total allocation earnings, " +
+                "total distributed, distribution performance, and actions rewarded.",
+    )
+    @AppIdParameter(required = true)
+    @CommonApiResponses
+    open fun getRewardDetails(@RequestParam appId: String): RewardDetailsResponse {
+        return xAllocService.getRewardDetails(appId)
+    }
 }
