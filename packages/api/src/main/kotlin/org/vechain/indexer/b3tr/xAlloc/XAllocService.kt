@@ -124,13 +124,14 @@ open class XAllocService(
             val action = actionSummaries[roundId]
             val cycleInfo = cycleInfoByRound[roundId]
 
-            val allocationEarnings =
+            val totalAllocationAmount = (earning?.totalAmount ?: java.math.BigDecimal.ZERO).clean()
+            val rewardsAllocationAmount =
                 (earning?.rewardsAllocationAmount ?: java.math.BigDecimal.ZERO).clean()
             val b3trDistributed = (action?.totalRewardAmount ?: java.math.BigDecimal.ZERO).clean()
             val performance =
-                if (allocationEarnings > java.math.BigDecimal.ZERO) {
+                if (totalAllocationAmount > java.math.BigDecimal.ZERO) {
                     b3trDistributed
-                        .divide(allocationEarnings, 10, java.math.RoundingMode.HALF_UP)
+                        .divide(totalAllocationAmount, 10, java.math.RoundingMode.HALF_UP)
                         .multiply(java.math.BigDecimal(100))
                         .setScale(4, java.math.RoundingMode.HALF_UP)
                 } else {
@@ -140,7 +141,8 @@ open class XAllocService(
             DistributionPerformanceItem(
                 roundId = roundId,
                 roundTime = cycleInfo?.blockTimestamp ?: 0L,
-                allocationEarnings = allocationEarnings,
+                totalAllocationAmount = totalAllocationAmount,
+                rewardsAllocationAmount = rewardsAllocationAmount,
                 b3trDistributed = b3trDistributed,
                 distributionPerformance = performance,
             )

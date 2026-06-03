@@ -12,17 +12,22 @@ data class DistributionPerformanceItem(
     )
     val roundTime: Long,
     @field:Schema(
-        description = "B3TR allocated to the app for rewards in this round.",
+        description = "Total B3TR allocated to the app this round (rewards + DBA).",
         example = "70331.81455991528",
     )
-    val allocationEarnings: BigDecimal,
+    val totalAllocationAmount: BigDecimal,
+    @field:Schema(
+        description = "B3TR allocated to the app for rewarding users in this round.",
+        example = "70331.81455991528",
+    )
+    val rewardsAllocationAmount: BigDecimal,
     @field:Schema(
         description = "B3TR actually distributed by the app in this round.",
         example = "25.0",
     )
     val b3trDistributed: BigDecimal,
     @field:Schema(
-        description = "Percentage of allocated rewards actually distributed (0-100).",
+        description = "Percentage of total allocation actually distributed (0-100).",
         example = "0.0355",
     )
     val distributionPerformance: BigDecimal,
