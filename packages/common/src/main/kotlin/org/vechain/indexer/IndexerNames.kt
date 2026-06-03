@@ -291,11 +291,6 @@ object IndexerNames {
         const val COLLECTION = "xapp_review_votes"
     }
 
-    object XAPP_SCORING_ROUND {
-        const val NAME = "XAppScoringRoundIndexer"
-        const val COLLECTION = "xapp_scoring_rounds"
-    }
-
     object ONCHAIN_SCORE {
         const val NAME = "OnchainScoringAggregator"
         const val COLLECTION = "b3tr_onchain_scores"
