@@ -236,6 +236,11 @@ object IndexerNames {
         const val COLLECTION = "b3tr_navigator_fee_summaries"
     }
 
+    object NAVIGATOR_VOTE_ROUND_REPORT {
+        const val NAME = "NavigatorVoteRoundReportAggregator"
+        const val COLLECTION = "b3tr_navigator_vote_round_reports"
+    }
+
     object B3TR_CHALLENGES {
         const val NAME = "B3trChallengesIndexer"
         const val COLLECTION = "b3tr_challenges"
