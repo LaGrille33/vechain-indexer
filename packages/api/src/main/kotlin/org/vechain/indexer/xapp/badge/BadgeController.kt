@@ -118,7 +118,7 @@ open class BadgeController(private val service: BadgeApiService) {
 
     @GetMapping("/apps/{appId}/badges/roundRank")
     @Operation(
-        summary = "Get badge rank for a specific round, along with total count and latest round."
+        summary = "Get badge rank for the previous round, along with total count and latest round."
     )
     @CommonApiResponses
     open fun getBadgeRoundRank(
@@ -132,8 +132,5 @@ open class BadgeController(private val service: BadgeApiService) {
         )
         @RequestParam
         badgeType: String,
-        @Parameter(description = "The round number to query.", required = true, example = "5")
-        @RequestParam
-        round: Long,
-    ): BadgeRoundRankResponse = service.getBadgeRoundRank(appId, badgeType, round)
+    ): BadgeRoundRankResponse = service.getBadgeRoundRank(appId, badgeType)
 }

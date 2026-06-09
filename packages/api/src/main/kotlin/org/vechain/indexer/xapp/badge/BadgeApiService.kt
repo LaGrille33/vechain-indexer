@@ -178,16 +178,17 @@ open class BadgeApiService(
         return AppEarnedBadgesResponse(appId = appId, badges = badges)
     }
 
-    open fun getBadgeRoundRank(
-        appId: String,
-        badgeType: String,
-        round: Long,
-    ): BadgeRoundRankResponse {
+    open fun getBadgeRoundRank(appId: String, badgeType: String): BadgeRoundRankResponse {
+        val currentCycle =
+            cycleInfoRepository.findTopByOrderByRoundIdDesc()
+                ?: throw NoSuchElementException("No cycle info found")
+        val previousRound = currentCycle.roundId - 1
+        val round = if (previousRound < 1) 0L else previousRound.toLong()
         val type = BadgeType.fromValue(badgeType)
         val totalBadgesEarned = repository.countByAppIdAndBadgeType(appId, type)
         val latestAward = repository.findTopByAppIdAndBadgeTypeOrderByRoundDesc(appId, type)
         val targetAwards = repository.findAllByAppIdAndBadgeType(appId, type)
-        val rank = targetAwards.find { it.round == round }?.rank
+        val rank = if (round > 0) targetAwards.find { it.round == round }?.rank else null
         return BadgeRoundRankResponse(
             appId = appId,
             badgeType = type,
