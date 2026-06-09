@@ -67,7 +67,8 @@ class NavigatorVoteRoundReportAggregationService(
         }
 
         val allCycles =
-            cycleInfoRepository.findByRoundIdIn((lastProcessedRound + 1..latestCycle.roundId).toList())
+            cycleInfoRepository
+                .findByRoundIdIn((lastProcessedRound + 1..latestCycle.roundId).toList())
                 .sortedBy { it.roundId }
         if (allCycles.isEmpty()) return
 
@@ -104,18 +105,15 @@ class NavigatorVoteRoundReportAggregationService(
 
         val voteQuery =
             Query(
-                Criteria.where("eventName")
-                    .`is`(HISTORY_EVENT_NAME)
-                    .and("roundId")
-                    .`is`(roundId.toString())
-            ).with(Sort.by(Sort.Direction.ASC, "blockNumber"))
+                    Criteria.where("eventName")
+                        .`is`(HISTORY_EVENT_NAME)
+                        .and("roundId")
+                        .`is`(roundId.toString())
+                )
+                .with(Sort.by(Sort.Direction.ASC, "blockNumber"))
 
         val votes =
-            mongoTemplate.find(
-                voteQuery,
-                Document::class.java,
-                IndexerNames.HISTORY.COLLECTION,
-            )
+            mongoTemplate.find(voteQuery, Document::class.java, IndexerNames.HISTORY.COLLECTION)
 
         val voteEventsByNavigator = mutableMapOf<String, Long>()
         val citizenSetByNavigator = mutableMapOf<String, MutableSet<String>>()
@@ -165,8 +163,7 @@ class NavigatorVoteRoundReportAggregationService(
                     navigator = navigator,
                     voteEvents = voteEventsByNavigator[navigator] ?: 0L,
                     citizenCount = citizenSetByNavigator[navigator]?.size?.toLong() ?: 0L,
-                    weightTotal =
-                        BigDecimal(weightByNavigator[navigator] ?: BigInteger.ZERO),
+                    weightTotal = BigDecimal(weightByNavigator[navigator] ?: BigInteger.ZERO),
                     topApps = topApps,
                 )
             }
@@ -174,10 +171,8 @@ class NavigatorVoteRoundReportAggregationService(
         val navigatorCount =
             mongoTemplate.count(
                 Query(
-                    Criteria.where("status").`in`(
-                        NavigatorStatus.ACTIVE.name,
-                        NavigatorStatus.EXITING.name,
-                    )
+                    Criteria.where("status")
+                        .`in`(NavigatorStatus.ACTIVE.name, NavigatorStatus.EXITING.name)
                 ),
                 IndexerNames.NAVIGATOR.COLLECTION,
             )

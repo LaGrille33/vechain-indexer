@@ -47,4 +47,6 @@ constructor(
     val topApps: List<NavigatorAppWeight>,
 )
 
-data class NavigatorAppWeight @ConstructorBinding constructor(val appId: String, val weight: BigInteger)
+data class NavigatorAppWeight
+@ConstructorBinding
+constructor(val appId: String, val weight: BigInteger)
