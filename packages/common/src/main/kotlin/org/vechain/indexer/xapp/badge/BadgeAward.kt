@@ -72,8 +72,13 @@ data class BadgeSummary(
     val badgeName: String,
     @Schema(description = "Whether the badge is published", example = "true")
     val isPublished: Boolean,
-    @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
-    @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "5") val totalBadgesEarned: Int,
+    @Schema(description = "Latest Badges", example = "12") val latestBadges: Long?,
+    @Schema(
+        description = "Whether the app has earned this badge: 1 = earned, 0 = not earned",
+        example = "1",
+    )
+    val earned: Int,
 )
 
 @Schema(description = "Detailed information for a specific badge type")
@@ -85,8 +90,8 @@ data class BadgeDetail(
     val isPublished: Boolean,
     @Schema(description = "Description of the badge", example = "Awarded to top ecosystem dApps")
     val description: String,
-    @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
-    @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "5") val totalBadgesEarned: Int,
+    @Schema(description = "Latest Badges", example = "12") val latestBadges: Long?,
     @Schema(description = "List of award records") val records: List<BadgeRecord>,
 )
 
@@ -111,8 +116,8 @@ data class BadgeRoundInfo(
 )
 data class BadgeStatsResponse(
     @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
-    @Schema(description = "Total Badges Earned", example = "5") val totalCount: Int,
-    @Schema(description = "Latest Badges", example = "12") val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "5") val totalBadgesEarned: Int,
+    @Schema(description = "Latest Badges", example = "12") val latestBadges: Long?,
     @Schema(description = "Acquisition Records") val rounds: List<BadgeRoundInfo>,
 )
 
@@ -129,7 +134,12 @@ data class BadgeAwardItem(
     @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
     @Schema(description = "Badge display name", example = "Top Ecosystem DApp")
     val badgeName: String,
-    @Schema(description = "Rank in this round", example = "3") val rank: Int,
+    @Schema(description = "Rank in this round", example = "3") val rank: Int?,
+    @Schema(
+        description = "Whether the app earned this badge: 1 = earned, 0 = not earned",
+        example = "1",
+    )
+    val earned: Int,
 )
 
 @Schema(description = "Earned badges for an app, grouped by badge type")
@@ -144,8 +154,8 @@ data class BadgeRoundRankResponse(
     @Schema(description = "Badge type", example = "topEcosystemDapp") val badgeType: BadgeType,
     @Schema(description = "The queried round number", example = "5") val round: Long,
     @Schema(description = "Rank in this round, null if not awarded", example = "3") val rank: Int?,
-    @Schema(description = "Total Badges Earned", example = "12") val totalCount: Long,
-    @Schema(description = "Latest Badges", example = "15") val latestRound: Long?,
+    @Schema(description = "Total Badges Earned", example = "12") val totalBadgesEarned: Long,
+    @Schema(description = "Latest Badges", example = "15") val latestBadges: Long?,
 )
 
 @Schema(description = "Request body for updating badge visibility")

@@ -50,8 +50,9 @@ open class BadgeApiService(
                 badgeType = type,
                 badgeName = BADGE_NAMES[type] ?: type.name,
                 isPublished = typeAwards.isEmpty() || typeAwards.all { it.isPublished },
-                totalCount = typeAwards.size,
-                latestRound = typeAwards.maxByOrNull { it.round }?.round,
+                totalBadgesEarned = typeAwards.size,
+                latestBadges = typeAwards.maxByOrNull { it.round }?.round,
+                earned = if (typeAwards.isEmpty()) 0 else 1,
             )
         }
     }
@@ -63,8 +64,8 @@ open class BadgeApiService(
             badgeName = BADGE_NAMES[badgeType] ?: badgeType.name,
             isPublished = awards.isEmpty() || awards.all { it.isPublished },
             description = BADGE_DESCRIPTIONS[badgeType] ?: "",
-            totalCount = awards.size,
-            latestRound = awards.maxByOrNull { it.round }?.round,
+            totalBadgesEarned = awards.size,
+            latestBadges = awards.maxByOrNull { it.round }?.round,
             records =
                 awards
                     .sortedByDescending { it.round }
@@ -98,8 +99,8 @@ open class BadgeApiService(
         val allCycles = cycleInfoRepository.findAll().sortedByDescending { it.roundId }
         return BadgeStatsResponse(
             badgeType = type,
-            totalCount = awards.size,
-            latestRound = awards.maxByOrNull { it.round }?.round,
+            totalBadgesEarned = awards.size,
+            latestBadges = awards.maxByOrNull { it.round }?.round,
             rounds =
                 allCycles.map { cycle ->
                     BadgeRoundInfo(
@@ -128,17 +129,28 @@ open class BadgeApiService(
                 appId = appId,
                 round = previousRound,
                 roundTimestamp = null,
-                badges = emptyList(),
+                badges =
+                    BadgeType.entries.map { type ->
+                        BadgeAwardItem(
+                            badgeType = type,
+                            badgeName = BADGE_NAMES[type] ?: type.name,
+                            rank = null,
+                            earned = 0,
+                        )
+                    },
             )
         }
         val previousCycle = cycleInfoRepository.findByRoundId(previousRound)
         val awards = repository.findAllByAppId(appId).filter { it.round == previousRound.toLong() }
+        val earnedByType = awards.associateBy { it.badgeType }
         val badgeItems =
-            awards.map { award ->
+            BadgeType.entries.map { type ->
+                val award = earnedByType[type]
                 BadgeAwardItem(
-                    badgeType = award.badgeType,
-                    badgeName = BADGE_NAMES[award.badgeType] ?: award.badgeType.name,
-                    rank = award.rank,
+                    badgeType = type,
+                    badgeName = BADGE_NAMES[type] ?: type.name,
+                    rank = award?.rank,
+                    earned = if (award != null) 1 else 0,
                 )
             }
         return AppPreviousRoundBadgeResponse(
@@ -152,15 +164,15 @@ open class BadgeApiService(
     open fun getEarnedBadges(appId: String): AppEarnedBadgesResponse {
         val allAwards = repository.findAllByAppId(appId)
         val badges =
-            BadgeType.entries.mapNotNull { type ->
+            BadgeType.entries.map { type ->
                 val typeAwards = allAwards.filter { it.badgeType == type }
-                if (typeAwards.isEmpty()) return@mapNotNull null
                 BadgeSummary(
                     badgeType = type,
                     badgeName = BADGE_NAMES[type] ?: type.name,
-                    isPublished = typeAwards.all { it.isPublished },
-                    totalCount = typeAwards.size,
-                    latestRound = typeAwards.maxOf { it.round },
+                    isPublished = typeAwards.isEmpty() || typeAwards.all { it.isPublished },
+                    totalBadgesEarned = typeAwards.size,
+                    latestBadges = typeAwards.maxByOrNull { it.round }?.round,
+                    earned = if (typeAwards.isEmpty()) 0 else 1,
                 )
             }
         return AppEarnedBadgesResponse(appId = appId, badges = badges)
@@ -172,7 +184,7 @@ open class BadgeApiService(
         round: Long,
     ): BadgeRoundRankResponse {
         val type = BadgeType.fromValue(badgeType)
-        val totalCount = repository.countByAppIdAndBadgeType(appId, type)
+        val totalBadgesEarned = repository.countByAppIdAndBadgeType(appId, type)
         val latestAward = repository.findTopByAppIdAndBadgeTypeOrderByRoundDesc(appId, type)
         val targetAwards = repository.findAllByAppIdAndBadgeType(appId, type)
         val rank = targetAwards.find { it.round == round }?.rank
@@ -181,8 +193,8 @@ open class BadgeApiService(
             badgeType = type,
             round = round,
             rank = rank,
-            totalCount = totalCount,
-            latestRound = latestAward?.round,
+            totalBadgesEarned = totalBadgesEarned,
+            latestBadges = latestAward?.round,
         )
     }
 
