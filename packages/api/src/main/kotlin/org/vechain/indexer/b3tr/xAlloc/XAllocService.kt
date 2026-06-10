@@ -135,7 +135,7 @@ open class XAllocService(
                     b3trDistributed
                         .divide(totalAllocationAmount, 10, java.math.RoundingMode.HALF_UP)
                         .multiply(java.math.BigDecimal(100))
-                        .setScale(4, java.math.RoundingMode.HALF_UP)
+                        .setScale(2, java.math.RoundingMode.HALF_UP)
                 } else {
                     java.math.BigDecimal.ZERO
                 }

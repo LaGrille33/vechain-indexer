@@ -28,7 +28,7 @@ data class DistributionPerformanceItem(
     val b3trDistributed: BigDecimal,
     @field:Schema(
         description = "Percentage of total allocation actually distributed (0-100).",
-        example = "0.0355",
+        example = "0.04",
     )
     val distributionPerformance: BigDecimal,
 )
