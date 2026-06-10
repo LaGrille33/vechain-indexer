@@ -14,7 +14,9 @@ import org.vechain.indexer.IndexerService
 import org.vechain.indexer.event.AbiLoader
 import org.vechain.indexer.event.model.abi.AbiElement
 import org.vechain.indexer.exception.ResourceNotFoundException
+import org.vechain.indexer.rest.PaginatedCountResponse
 import org.vechain.indexer.rest.PaginatedResponse
+import org.vechain.indexer.rest.paginatedCountResponse
 import org.vechain.indexer.rest.paginatedResponse
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.thor.client.ThorClient
@@ -57,7 +59,7 @@ open class ReviewApiService(
         viewer: String?,
         sortBy: String?,
         pageable: Pageable,
-    ): PaginatedResponse<ReviewWithVotes> {
+    ): PaginatedCountResponse<ReviewWithVotes> {
         val isMyReviews = sortBy == "my_reviews"
         val effectiveAuthor = if (isMyReviews) viewer else author
 
@@ -77,10 +79,28 @@ open class ReviewApiService(
                 else -> reviewRepository.findAllByAppId(appId, pageable)
             }
 
+        val total =
+            when {
+                effectiveAuthor != null && viewer != null ->
+                    reviewRepository.countByAppIdAndAuthorWithViewerHidden(
+                        appId,
+                        effectiveAuthor,
+                        viewer,
+                    )
+                effectiveAuthor != null ->
+                    reviewRepository.countByAppIdAndAuthor(appId, effectiveAuthor)
+                viewer != null -> reviewRepository.countByAppIdWithViewerHidden(appId, viewer)
+                else -> reviewRepository.countByAppIdAndIsHiddenFalse(appId)
+            }
+
         val reviews = slice.content
         if (reviews.isEmpty()) {
-            return paginatedResponse(
-                org.springframework.data.domain.SliceImpl(emptyList(), pageable, false)
+            return paginatedCountResponse(
+                emptyList(),
+                pageable.pageNumber,
+                pageable.pageSize,
+                total,
+                false,
             )
         }
 
@@ -105,8 +125,12 @@ open class ReviewApiService(
                 )
             }
 
-        return paginatedResponse(
-            org.springframework.data.domain.SliceImpl(enriched, pageable, slice.hasNext())
+        return paginatedCountResponse(
+            enriched,
+            pageable.pageNumber,
+            pageable.pageSize,
+            total,
+            slice.hasNext(),
         )
     }
 

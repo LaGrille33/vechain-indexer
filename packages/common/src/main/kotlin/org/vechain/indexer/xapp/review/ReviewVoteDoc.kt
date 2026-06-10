@@ -27,7 +27,7 @@ constructor(
     @Schema(description = "Review ID", example = "6") val reviewId: Long,
     @Schema(
         description = "Voter wallet address (checksummed)",
-        example = "0x4F064B42dD4583754cd1E2D21C8FeF2786CbD4a9",
+        example = "0xf077b491b355e64048ce21e3a6fc4751eeea77fa",
     )
     val voter: String,
     @Schema(description = "Vote type: 1=UPVOTE, 2=DOWNVOTE, 3=REPORT", example = "1")

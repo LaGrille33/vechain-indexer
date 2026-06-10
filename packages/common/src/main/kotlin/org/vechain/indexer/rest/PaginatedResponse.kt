@@ -47,3 +47,50 @@ fun <T : Any> paginatedResponse(
         pagination = PaginationDetail(hasNext = hasNext, cursor = cursor),
     )
 }
+
+/** API response wrapper that includes a total count */
+@JsonView(Views.Public::class)
+data class PaginatedCountResponse<T>(
+    val data: List<T>,
+    val pagination: PaginationCountDetail,
+) where T : Any
+
+/** Pagination metadata with full page info */
+@JsonView(Views.Public::class)
+data class PaginationCountDetail(
+    val page: Int,
+    val size: Int,
+    val total: Long,
+    val totalPages: Int,
+    val hasNext: Boolean,
+)
+
+/**
+ * Builds a paginated API response with full page info.
+ *
+ * @param data The list of items to return
+ * @param page Current page number
+ * @param size Page size
+ * @param total Total number of items across all pages
+ * @param hasNext Whether there are more items
+ */
+fun <T : Any> paginatedCountResponse(
+    data: List<T>,
+    page: Int,
+    size: Int,
+    total: Long,
+    hasNext: Boolean,
+): PaginatedCountResponse<T> {
+    val totalPages = if (size > 0) ((total + size - 1) / size).toInt() else 0
+    return PaginatedCountResponse(
+        data = data,
+        pagination =
+            PaginationCountDetail(
+                page = page,
+                size = size,
+                total = total,
+                totalPages = totalPages,
+                hasNext = hasNext,
+            ),
+    )
+}

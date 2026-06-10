@@ -36,4 +36,17 @@ interface ReviewRepository : BaseIndexedRepository<Review, String> {
         viewer: String,
         pageable: Pageable,
     ): Slice<Review>
+
+    fun countByAppIdAndIsHiddenFalse(appId: String): Long
+
+    fun countByAppIdAndAuthor(appId: String, author: String): Long
+
+    @Query("{ 'appId': ?0, '\$or': [ { 'isHidden': false }, { 'author': ?1 } ] }", count = true)
+    fun countByAppIdWithViewerHidden(appId: String, viewer: String): Long
+
+    @Query(
+        "{ 'appId': ?0, 'author': ?1, '\$or': [ { 'isHidden': false }, { 'author': ?2 } ] }",
+        count = true,
+    )
+    fun countByAppIdAndAuthorWithViewerHidden(appId: String, author: String, viewer: String): Long
 }
