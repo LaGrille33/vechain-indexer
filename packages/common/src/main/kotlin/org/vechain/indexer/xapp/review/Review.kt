@@ -38,7 +38,7 @@ constructor(
     @Schema(description = "App ID (bytes32 hex)", example = "0x6d25...77b4") val appId: String,
     @Schema(
         description = "Author wallet address (checksummed)",
-        example = "0x4F064B42dD4583754cd1E2D21C8FeF2786CbD4a9",
+        example = "0xf077b491b355e64048ce21e3a6fc4751eeea77fa",
     )
     val author: String,
     @Schema(description = "Review title", example = "Great app") val title: String,

@@ -15,6 +15,7 @@ import org.vechain.indexer.constants.XAPP_PATH
 import org.vechain.indexer.docs.AppIdParameter
 import org.vechain.indexer.docs.CommonApiResponses
 import org.vechain.indexer.docs.PaginationParameters
+import org.vechain.indexer.rest.PaginatedCountResponse
 import org.vechain.indexer.rest.PaginatedResponse
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.utils.PaginationUtils.toPageable
@@ -52,7 +53,7 @@ open class ReviewController(private val service: ReviewApiService) {
         @RequestParam(required = false) direction: String?,
         @RequestParam(required = false) sortBy: String?,
         @RequestParam(required = false) author: String?,
-    ): PaginatedResponse<ReviewWithVotes> {
+    ): PaginatedCountResponse<ReviewWithVotes> {
         val normalizedSort = sortBy?.lowercase()
         val sortFields =
             when (normalizedSort) {

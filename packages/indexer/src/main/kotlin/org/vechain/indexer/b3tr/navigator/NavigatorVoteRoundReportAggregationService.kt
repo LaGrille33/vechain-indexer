@@ -31,7 +31,7 @@ class NavigatorVoteRoundReportAggregationService(
     }
 
     @Scheduled(
-        fixedDelayString = "\${indexer.navigator-vote-report.interval-ms:3600000}",
+        fixedDelayString = "\${indexer.navigator-vote-report.interval-ms:60000}",
         initialDelayString = "\${indexer.navigator-vote-report.initial-delay-ms:30000}",
     )
     fun aggregateNavigatorVoteReports() {

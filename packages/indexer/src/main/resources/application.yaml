@@ -72,10 +72,10 @@ management:
 
 spring.data:
   mongodb:
-    uri: ${MONGO_URI:mongodb://indexer:password@113.31.105.33:27017/vechain?authSource=admin}
+    uri: ${MONGO_URI:mongodb://indexer:password@localhost:27017/vechain?authSource=admin}
 
 thor:
-  url: ${THOR_URL:http://localhost:8669}
+  url: ${THOR_URL:https://mainnet.vechain.org}
 
 vechain:
   forks:
