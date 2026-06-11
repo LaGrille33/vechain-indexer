@@ -141,8 +141,8 @@ indexer:
   discord:
     bot-token: ${DISCORD_BOT_TOKEN:}
     channels: ${DISCORD_CHANNELS:}
-    interval-ms: ${INDEXER_DISCORD_INTERVAL_MS:3600000}
-    initial-delay-ms: ${INDEXER_DISCORD_INITIAL_DELAY_MS:60000}
+    interval-ms: ${INDEXER_DISCORD_INTERVAL_MS:}
+    initial-delay-ms: ${INDEXER_DISCORD_INITIAL_DELAY_MS:}
   genesis:
     vet-balances:
       # Optional override; if empty, inferred from Thor genesis block id (block 0)

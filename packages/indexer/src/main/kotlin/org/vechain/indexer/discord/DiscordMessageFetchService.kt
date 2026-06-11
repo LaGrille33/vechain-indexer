@@ -1,6 +1,12 @@
 package org.vechain.indexer.discord
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 import java.time.Instant
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -13,14 +19,13 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
 import org.vechain.indexer.IndexerNames
 
 @Service
 @Profile("b3tr", "discord-fetcher")
 class DiscordMessageFetchService(
     private val mongoTemplate: MongoTemplate,
-    private val webClientBuilder: WebClient.Builder,
+    private val objectMapper: ObjectMapper,
     @Value("\${indexer.discord.bot-token:}") private val botToken: String,
     @Value("\${indexer.discord.channels:}") private val channelsConfig: String,
 ) {
@@ -36,12 +41,8 @@ class DiscordMessageFetchService(
         private const val REQUEST_TIMEOUT_SECONDS = 30L
     }
 
-    private val discordClient: WebClient by lazy {
-        webClientBuilder
-            .baseUrl(DISCORD_API)
-            .defaultHeader("Authorization", botToken)
-            .defaultHeader("Content-Type", "application/json")
-            .build()
+    private val httpClient: HttpClient by lazy {
+        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS)).build()
     }
 
     data class ChannelConfig(val name: String, val id: String)
@@ -150,27 +151,33 @@ class DiscordMessageFetchService(
 
         while (true) {
             try {
-                val batch =
-                    discordClient
-                        .get()
-                        .uri(
-                            "/channels/{channelId}/messages?limit={limit}&after={after}",
-                            channelId,
-                            PAGE_LIMIT,
-                            cursor,
-                        )
-                        .retrieve()
-                        .bodyToFlux(JsonNode::class.java)
-                        .collectList()
-                        .block()
+                val uri =
+                    "$DISCORD_API/channels/$channelId/messages?limit=$PAGE_LIMIT&after=$cursor"
+                val request =
+                    HttpRequest.newBuilder()
+                        .uri(URI.create(uri))
+                        .header("Authorization", "Bot $botToken")
+                        .header("Content-Type", "application/json")
+                        .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+                        .GET()
+                        .build()
 
-                if (batch == null || batch.isEmpty()) break
+                val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
-                val sorted = batch.sortedBy { it["id"].asLong() }
+                if (response.statusCode() != 200) {
+                    throw RuntimeException(
+                        "Discord API returned ${response.statusCode()}: ${response.body().take(200)}"
+                    )
+                }
+
+                val batch = objectMapper.readTree(response.body())
+                if (batch == null || !batch.isArray || batch.isEmpty) break
+
+                val sorted = batch.toList().sortedBy { it["id"].asLong() }
                 out.addAll(sorted)
                 cursor = sorted.maxOf { it["id"].asLong() }
 
-                if (batch.size < PAGE_LIMIT) break
+                if (batch.size() < PAGE_LIMIT) break
 
                 Thread.sleep(250)
             } catch (e: Exception) {
