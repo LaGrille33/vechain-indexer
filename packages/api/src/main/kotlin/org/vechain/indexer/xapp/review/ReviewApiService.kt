@@ -1,7 +1,5 @@
 package org.vechain.indexer.xapp.review
 
-import java.util.concurrent.ConcurrentHashMap
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
 import org.springframework.data.domain.Pageable
 import org.springframework.data.mongodb.core.MongoTemplate
@@ -11,15 +9,12 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.IndexerService
-import org.vechain.indexer.event.AbiLoader
-import org.vechain.indexer.event.model.abi.AbiElement
 import org.vechain.indexer.exception.ResourceNotFoundException
 import org.vechain.indexer.rest.PaginatedCountResponse
 import org.vechain.indexer.rest.PaginatedResponse
 import org.vechain.indexer.rest.paginatedCountResponse
 import org.vechain.indexer.rest.paginatedResponse
 import org.vechain.indexer.thor.HexUtils.normalise
-import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.xapp.review.repository.ReviewRepository
 import org.vechain.indexer.xapp.review.repository.ReviewVoteRepository
 
@@ -30,20 +25,7 @@ open class ReviewApiService(
     private val reviewVoteRepository: ReviewVoteRepository,
     private val mongoTemplate: MongoTemplate,
     private val domainResolver: VoteDomainResolver?,
-    private val thorClient: ThorClient,
-    @Value(
-        "\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT:\${XAPP_REVIEW_MANAGER_CONTRACT:0xd369454a6fdca471831ef87f488b1f67418a336a}}"
-    )
-    private val reviewManagerContractAddress: String,
 ) : IndexerService {
-
-    private val abiCache = ConcurrentHashMap<String, AbiElement>()
-
-    private fun loadAbiFunction(name: String): AbiElement =
-        abiCache.computeIfAbsent(name) {
-            AbiLoader.loadFunctions("abis/b3tr", listOf(name)).firstOrNull { it.name == name }
-                ?: throw IllegalArgumentException("Function '$name' not found in b3tr ABIs")
-        }
 
     /**
      * Returns reviews for an app enriched with vote percentages, domain resolution, and user
@@ -61,6 +43,18 @@ open class ReviewApiService(
         pageable: Pageable,
     ): PaginatedCountResponse<ReviewWithVotes> {
         val isMyReviews = sortBy == "my_reviews"
+
+        // my_reviews requires wallet to identify the viewer; return empty if missing.
+        if (isMyReviews && viewer == null) {
+            return paginatedCountResponse(
+                emptyList(),
+                pageable.pageNumber,
+                pageable.pageSize,
+                0,
+                false,
+            )
+        }
+
         val effectiveAuthor = if (isMyReviews) viewer else author
 
         val slice =
@@ -198,50 +192,27 @@ open class ReviewApiService(
         search: String?,
         pageable: Pageable,
     ): PaginatedResponse<ReviewVoteDetail> {
-        // If search looks like a domain (contains '.'), resolve to address first
-        var addressSearch: String? = null
-        var domainSearch: String? = null
         if (!search.isNullOrBlank()) {
             val trimmed = search.trim()
-            if (trimmed.contains(".")) {
-                domainSearch = trimmed
-            } else {
-                addressSearch = trimmed
-            }
-        }
-
-        val slice =
-            if (addressSearch != null) {
-                reviewVoteRepository.findByReviewIdAndVoterContaining(
-                    reviewId,
-                    normalise(addressSearch),
-                    pageable,
+            return if (trimmed.contains(".")) {
+                // Domain search: query stored domain field in MongoDB (indexed at write time)
+                paginatedResponse(
+                    reviewVoteRepository
+                        .findByReviewIdAndDomainContainingIgnoreCase(reviewId, trimmed, pageable)
+                        .map { it.toDetail() }
                 )
             } else {
-                reviewVoteRepository.findAllByReviewId(reviewId, pageable)
-            }
-
-        var votes = slice.content.map { it.toDetail() }
-
-        // Batch-resolve domains for the current page
-        if (votes.isNotEmpty()) {
-            try {
-                val addresses = votes.map { it.voter }
-                val domains = domainResolver?.resolveDomains(addresses) ?: emptyMap()
-                votes = votes.map { it.copy(domain = domains[it.voter]) }
-            } catch (_: Exception) {
-                // Domain resolution is best-effort
+                // Address search: regex on voter field
+                paginatedResponse(
+                    reviewVoteRepository
+                        .findByReviewIdAndVoterContaining(reviewId, normalise(trimmed), pageable)
+                        .map { it.toDetail() }
+                )
             }
         }
 
-        // If searching by domain, filter results after resolution
-        if (domainSearch != null) {
-            val query = domainSearch.lowercase()
-            votes = votes.filter { it.domain?.lowercase()?.contains(query) == true }
-        }
-
-        val result = org.springframework.data.domain.SliceImpl(votes, pageable, slice.hasNext())
-        return paginatedResponse(result)
+        val slice = reviewVoteRepository.findAllByReviewId(reviewId, pageable)
+        return paginatedResponse(slice.map { it.toDetail() })
     }
 
     /** Batch-compute vote stats for a list of review IDs in a single aggregation. */
@@ -326,7 +297,7 @@ open class ReviewApiService(
     private fun ReviewVoteDoc.toDetail(): ReviewVoteDetail =
         ReviewVoteDetail(
             voter = voter,
-            domain = null,
+            domain = domain,
             voteType = voteType,
             voteTypeName =
                 when (voteType) {

@@ -121,26 +121,25 @@ open class ReviewService(
                 }
 
                 "ReviewVoted" -> {
+                    // Vote counts are overwritten by enrichWithContractData (which reads
+                    // authoritative values from the contract), so we only bump version/block
+                    // metadata here to trigger the enrichment pass.
                     val reviewId = getReviewId(event) ?: continue
-                    val voteType =
-                        (event.params.getReturnValues()["voteType"] as? Number)?.toInt() ?: continue
 
                     val recordId = reviewId.toString()
                     val (existing, nextVersion) = accumulator.resolve(recordId)
                     val current = existing ?: continue
 
-                    val updated =
-                        when (voteType) {
-                            1 -> current.copy(version = nextVersion, upvotes = current.upvotes + 1)
-                            2 ->
-                                current.copy(
-                                    version = nextVersion,
-                                    downvotes = current.downvotes + 1,
-                                )
-                            3 -> current.copy(version = nextVersion, reports = current.reports + 1)
-                            else -> continue
-                        }
-                    accumulator.put(recordId, current, updated)
+                    accumulator.put(
+                        recordId,
+                        current,
+                        current.copy(
+                            version = nextVersion,
+                            blockId = event.blockId,
+                            blockNumber = event.blockNumber,
+                            blockTimestamp = event.blockTimestamp,
+                        ),
+                    )
                 }
 
                 "ReviewHidden" -> {

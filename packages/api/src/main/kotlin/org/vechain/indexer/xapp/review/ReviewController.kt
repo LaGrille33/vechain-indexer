@@ -40,7 +40,7 @@ open class ReviewController(private val service: ReviewApiService) {
     @Parameter(
         name = "sortBy",
         description =
-            "Sort field: upvotes/most_upvotes (by upvote count), downvotes/most_downvotes (by downvote count), reports/most_reports (by report count), defaults to timestamp",
+            "Sort field: newest (default, by time), most_upvotes (by upvote count), most_downvotes (by downvote count), most_reports (by report count), my_reviews (viewer's own reviews, requires wallet)",
     )
     @Parameter(name = "author", description = "Filter by author address (checksummed format)")
     @CommonApiResponses

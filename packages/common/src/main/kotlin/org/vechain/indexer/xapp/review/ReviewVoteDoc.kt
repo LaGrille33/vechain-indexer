@@ -34,6 +34,8 @@ constructor(
     val voteType: Int,
     @Schema(description = "Vote timestamp (Unix seconds)", example = "1779424224")
     val timestamp: Long,
+    @Schema(description = "Voter vet domain name (null if not resolved)", example = "jun.vet")
+    val domain: String? = null,
 ) : VersionedDocument {
     constructor(
         version: Int,
@@ -44,6 +46,7 @@ constructor(
         voter: String,
         voteType: Int,
         timestamp: Long,
+        domain: String? = null,
     ) : this(
         id = documentId(reviewId, voter),
         version = version,
@@ -54,6 +57,7 @@ constructor(
         voter = voter,
         voteType = voteType,
         timestamp = timestamp,
+        domain = domain,
     )
 
     override fun getDocumentId(): String = id
