@@ -19,7 +19,7 @@ import org.vechain.indexer.thor.Address
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.validation.ValidAddress
 
-@Profile("b3tr", "xapp-rating", "xapp-review-vote")
+@Profile("b3tr", "xapp-rating")
 @Validated
 @RestController
 @RequestMapping(XAPP_PATH)

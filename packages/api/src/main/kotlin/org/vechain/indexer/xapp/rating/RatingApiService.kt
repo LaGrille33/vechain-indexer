@@ -39,7 +39,7 @@ data class AppRatingDetail(
     @Schema(description = "Rating (1-5)", example = "4") val rating: Int,
 )
 
-@Profile("b3tr", "xapp-rating", "xapp-review-vote")
+@Profile("b3tr", "xapp-rating")
 @Service
 open class RatingApiService(
     private val repository: AppRatingRepository,

@@ -31,4 +31,11 @@ interface ReviewVoteRepository : BaseIndexedRepository<ReviewVoteDoc, String> {
         voter: String,
         pageable: Pageable,
     ): Slice<ReviewVoteDoc>
+
+    @Query("{ 'reviewId': ?0, 'domain': { '\$regex': ?1, '\$options': 'i' } }")
+    fun findByReviewIdAndDomainContainingIgnoreCase(
+        reviewId: Long,
+        domain: String,
+        pageable: Pageable,
+    ): Slice<ReviewVoteDoc>
 }
