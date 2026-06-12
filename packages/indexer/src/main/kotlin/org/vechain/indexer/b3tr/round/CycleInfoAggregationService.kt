@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Profile
 import org.springframework.data.mongodb.core.BulkOperations
 import org.springframework.data.mongodb.core.MongoTemplate
@@ -13,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Update
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
+import org.vechain.indexer.b3tr.event.CycleInfoAggregationCompletedEvent
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.thor.model.BlockRevision
@@ -28,6 +30,7 @@ class CycleInfoAggregationService(
     private val mongoTemplate: MongoTemplate,
     private val thorClient: ThorClient,
     private val cycleInfoRepository: CycleInfoRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher,
     @param:Value("\${business-event.substitutions.EMISSIONS}")
     private val emissionsContractAddress: String,
 ) {
@@ -56,14 +59,19 @@ class CycleInfoAggregationService(
         initialDelayString = "\${indexer.cycle-info.initial-delay-ms:30000}",
     )
     fun aggregateCycleInfo() {
+        var syncedRound = 0
         try {
-            runBlocking { aggregateCycleInfoInternal() }
+            syncedRound = runBlocking { aggregateCycleInfoInternal() }
         } catch (e: Exception) {
             logger.error("Cycle info aggregation failed", e)
+        } finally {
+            applicationEventPublisher.publishEvent(
+                CycleInfoAggregationCompletedEvent(syncedUpToRound = syncedRound)
+            )
         }
     }
 
-    private suspend fun aggregateCycleInfoInternal() {
+    private suspend fun aggregateCycleInfoInternal(): Int {
         val started = System.currentTimeMillis()
         logger.info("Starting cycle info aggregation...")
 
@@ -89,7 +97,7 @@ class CycleInfoAggregationService(
 
         if (events.isEmpty()) {
             logger.info("No emission events found, skipping")
-            return
+            return 0
         }
 
         // 4. Filter new rounds (round > lastProcessedRound) and deduplicate by roundId
@@ -102,7 +110,7 @@ class CycleInfoAggregationService(
 
         if (newRounds.isEmpty()) {
             logger.info("No new rounds to process (lastProcessed={})", lastProcessedRound)
-            return
+            return 0
         }
 
         // 5. Bulk upsert into MongoDB
@@ -145,6 +153,7 @@ class CycleInfoAggregationService(
             maxRoundId,
             elapsed,
         )
+        return maxRoundId
     }
 
     private suspend fun fetchAllEventLogs(
