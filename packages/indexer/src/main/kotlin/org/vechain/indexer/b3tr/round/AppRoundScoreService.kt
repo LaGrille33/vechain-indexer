@@ -2,8 +2,8 @@ package org.vechain.indexer.b3tr.round
 
 import jakarta.annotation.PostConstruct
 import java.math.BigDecimal
+import java.math.MathContext
 import java.math.RoundingMode
-import kotlin.math.ln1p
 import org.bson.Document
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
@@ -43,9 +43,100 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
 
     companion object {
         // Weights from the proposal
-        private const val WEIGHT_WAU = 0.5
-        private const val WEIGHT_NEW_USERS = 0.3
-        private const val WEIGHT_ACTIONS = 0.2
+        private val WEIGHT_WAU = BigDecimal("0.5")
+        private val WEIGHT_NEW_USERS = BigDecimal("0.3")
+        private val WEIGHT_ACTIONS = BigDecimal("0.2")
+
+        private val HUNDRED = BigDecimal("100")
+        private val HALF = BigDecimal("0.5")
+
+        // ln1pBig helpers
+        private val TWO = BigDecimal(2)
+        private val LN2 = BigDecimal("0.69314718055994530941723212145817656807550013436025")
+        private val MATH_CTX = MathContext(34, RoundingMode.HALF_UP)
+
+        // Internal computation scale; results are rounded to 4 dp when stored.
+        private const val COMPUTE_SCALE = 10
+        private const val MAX_LN_ITER = 200
+
+        /**
+         * Percentile rank with tie handling. `P(x_i) = (# { j | x_j < x_i } + 0.5 × T) / N × 100`
+         * where T = number of values tied with x_i. Static utility — callable from Kotlin and Java
+         * as `AppRoundScoreService.percentileRank(value, allValues)`.
+         *
+         * Operates on [BigDecimal] so comparisons and ties are exact; `below`, `tied`, and `n` are
+         * exact integer counts. Returns `0` for an empty population.
+         *
+         * @param value the value to rank
+         * @param allValues the full population to rank against (may include [value])
+         * @return percentile rank in `[0, 100]`, computed at [COMPUTE_SCALE] precision
+         */
+        @JvmStatic
+        fun percentileRank(value: BigDecimal, allValues: List<BigDecimal>): BigDecimal {
+            val n = allValues.size
+            if (n == 0) return BigDecimal.ZERO
+            var below = 0
+            var tied = 0
+            for (v in allValues) {
+                when (v.compareTo(value)) {
+                    -1 -> below++
+                    0 -> tied++
+                }
+            }
+            val belowBd = BigDecimal(below)
+            val nBd = BigDecimal(n)
+            return if (tied == 1) {
+                belowBd.divide(nBd, COMPUTE_SCALE, RoundingMode.HALF_UP).multiply(HUNDRED)
+            } else {
+                belowBd
+                    .add(HALF.multiply(BigDecimal(tied)))
+                    .divide(nBd, COMPUTE_SCALE, RoundingMode.HALF_UP)
+                    .multiply(HUNDRED)
+            }
+        }
+
+        /**
+         * High-precision `ln(1 + x)` for non-negative x, computed entirely with [BigDecimal] (no
+         * Double). Static utility — callable from Kotlin and Java as
+         * `AppRoundScoreService.ln1pBig(x)`.
+         *
+         * Argument reduction `1+x = m · 2^p` with `m ∈
+         * [1, 2)`, then `ln(m) = 2 · artanh((m-1)/(m+1))`; the artanh series converges fast because `(m-1)/(m+1) ∈ [0, 1/3)`. `ln(2)` is a precomputed high-precision constant, so the whole chain stays exact up to the [MATH_CTX]
+         * working precision. Returns `0` for `x ≤ 0`.
+         *
+         * @param x a non-negative value
+         * @return `ln(1 + x)` at [MATH_CTX] precision
+         */
+        @JvmStatic
+        fun ln1pBig(x: BigDecimal): BigDecimal {
+            if (x.signum() <= 0) return BigDecimal.ZERO
+            val y = x.add(BigDecimal.ONE) // 1 + x, y >= 1
+
+            // reduce y = m · 2^p, m in [1, 2)
+            var p = 0
+            var m = y
+            while (m.compareTo(TWO) >= 0) {
+                m = m.divide(TWO, MATH_CTX)
+                p++
+            }
+
+            // ln(m) = 2 · artanh(t), t = (m-1)/(m+1), t in [0, 1/3)
+            val t = m.subtract(BigDecimal.ONE).divide(m.add(BigDecimal.ONE), MATH_CTX)
+
+            // artanh(t) = Σ_{k>=0} t^(2k+1)/(2k+1)
+            var sum = BigDecimal.ZERO
+            var term = t // t^1
+            var k = 1
+            var guard = 0
+            while (guard++ < MAX_LN_ITER) {
+                val inc = term.divide(BigDecimal(k), MATH_CTX)
+                sum = sum.add(inc, MATH_CTX)
+                if (inc.signum() == 0) break
+                term = term.multiply(t, MATH_CTX).multiply(t, MATH_CTX) // t^(2k+1) -> t^(2k+3)
+                k += 2
+            }
+            return sum.multiply(TWO, MATH_CTX).add(BigDecimal(p).multiply(LN2, MATH_CTX), MATH_CTX)
+        }
     }
 
     @PostConstruct
@@ -136,10 +227,15 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
 
         val allAppIds = appMetrics.keys
 
-        // 3. Collect raw values for percentile computation
-        val allWau = allAppIds.map { appMetrics[it]?.wau?.toDouble() ?: 0.0 }
-        val allNewUsers = allAppIds.map { (newUsersData[it] ?: 0L).toDouble() }
-        val allActions = allAppIds.map { appMetrics[it]?.actions?.toDouble() ?: 0.0 }
+        // 3. Collect raw values for percentile computation (BigDecimal; exact for Long metrics)
+        val allWau = allAppIds.map { BigDecimal(appMetrics[it]?.wau ?: 0L) }
+        val allNewUsers = allAppIds.map { BigDecimal(newUsersData[it] ?: 0L) }
+        val allActions = allAppIds.map { BigDecimal(appMetrics[it]?.actions ?: 0L) }
+
+        // Pre-compute log-scaled values once (BigDecimal ln1p), reused for every app's ranking
+        val logAllWau = allWau.map { ln1pBig(it) }
+        val logAllNewUsers = allNewUsers.map { ln1pBig(it) }
+        val logAllActions = allActions.map { ln1pBig(it) }
 
         // 4. Build and persist per-app score documents
         val now = System.currentTimeMillis()
@@ -148,25 +244,25 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
 
         for (appId in allAppIds) {
             val metrics = appMetrics[appId] ?: continue
-            val wau = metrics.wau.toDouble()
-            val newUsers = (newUsersData[appId] ?: 0L).toDouble()
-            val actions = metrics.actions.toDouble()
 
-            // Log scaling
-            val logWau = ln1p(wau)
-            val logNew = ln1p(newUsers)
-            val logAct = ln1p(actions)
+            // Log scaling (BigDecimal throughout)
+            val logWau = ln1pBig(BigDecimal(metrics.wau))
+            val logNew = ln1pBig(BigDecimal(newUsersData[appId] ?: 0L))
+            val logAct = ln1pBig(BigDecimal(metrics.actions))
 
-            // Percentile ranks with tie handling
-            val pWau = percentileRank(logWau, allWau.map { ln1p(it) })
+            // Percentile ranks with tie handling (BigDecimal comparisons — exact ties)
+            val pWau = percentileRank(logWau, logAllWau)
             val pNew =
                 if (firstSeenAvailable) {
-                    percentileRank(logNew, allNewUsers.map { ln1p(it) })
-                } else 0.0
-            val pAct = percentileRank(logAct, allActions.map { ln1p(it) })
+                    percentileRank(logNew, logAllNewUsers)
+                } else BigDecimal.ZERO
+            val pAct = percentileRank(logAct, logAllActions)
 
-            // Weighted activity score
-            val activityScore = WEIGHT_WAU * pWau + WEIGHT_NEW_USERS * pNew + WEIGHT_ACTIONS * pAct
+            // Weighted activity score (BigDecimal arithmetic)
+            val activityScore =
+                WEIGHT_WAU.multiply(pWau)
+                    .add(WEIGHT_NEW_USERS.multiply(pNew))
+                    .add(WEIGHT_ACTIONS.multiply(pAct))
 
             val id = "${appId}_$roundId"
             bulkOps.upsert(
@@ -178,13 +274,10 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                     .set("wau", metrics.wau)
                     .set("newUsers", newUsersData[appId] ?: 0L)
                     .set("actions", metrics.actions)
-                    .set("pWau", BigDecimal(pWau).setScale(4, RoundingMode.HALF_UP))
-                    .set("pNewUsers", BigDecimal(pNew).setScale(4, RoundingMode.HALF_UP))
-                    .set("pActions", BigDecimal(pAct).setScale(4, RoundingMode.HALF_UP))
-                    .set(
-                        "activityScore",
-                        BigDecimal(activityScore).setScale(4, RoundingMode.HALF_UP),
-                    )
+                    .set("pWau", pWau.setScale(4, RoundingMode.HALF_UP))
+                    .set("pNewUsers", pNew.setScale(4, RoundingMode.HALF_UP))
+                    .set("pActions", pAct.setScale(4, RoundingMode.HALF_UP))
+                    .set("activityScore", activityScore.setScale(4, RoundingMode.HALF_UP))
                     .set("updatedAt", now),
             )
             count++
@@ -241,20 +334,6 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             map[appId] = toLong(doc.get("count"))
         }
         return map
-    }
-
-    // ──────────────────────────── Math helpers ────────────────────────────
-
-    /**
-     * Percentile rank with tie handling. `P(x_i) = (# { j | x_j < x_i } + 0.5 × T) / N × 100` where
-     * T = number of values tied with x_i.
-     */
-    private fun percentileRank(value: Double, allValues: List<Double>): Double {
-        val n = allValues.size
-        if (n == 0) return 0.0
-        val below = allValues.count { it < value }
-        val tied = allValues.count { it == value }
-        return (below + 0.5 * tied) / n * 100.0
     }
 }
 
