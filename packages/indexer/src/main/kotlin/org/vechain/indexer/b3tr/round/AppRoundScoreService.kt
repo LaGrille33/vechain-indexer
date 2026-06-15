@@ -21,11 +21,12 @@ import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
 
 /**
- * Computes the Activity Score for each dApp per round, as defined in the VBD Reputation Layer
- * Proposal. Triggered by [UserFirstSeenAggregationCompletedEvent] to ensure
+ * Computes the **Activity Score** and **Distribution Efficiency Score** for each dApp per round, as
+ * defined in the VBD Reputation Layer Proposal. Triggered by
+ * [UserFirstSeenAggregationCompletedEvent] to ensure
  * [b3tr_user_first_seen][IndexerNames.USER_FIRST_SEEN] data is up-to-date.
  *
- * ## Algorithm
+ * ## Activity Score algorithm
  * For each round, per dApp:
  * 1. **WAU** = distinct users with rewarded actions (row count in
  *    `b3tr_app_action_summaries_round`)
@@ -35,6 +36,16 @@ import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
  * 4. Apply **log scaling**: `ln(1 + value)`
  * 5. Compute **percentile rank** across all dApps (with tie handling)
  * 6. `ActivityScore = 0.5 × P_WAU + 0.3 × P_NewUsers + 0.2 × P_Actions`
+ *
+ * ## Distribution Efficiency Score algorithm (Appendix A.3)
+ * 1. **Alloc_7d** = B3TR allocated to the dApp this round, from
+ *    [b3tr_x_alloc_results][IndexerNames.X_ALLOC_RESULT].`totalAmount` (already 18-decimal scaled
+ *    to B3TR units)
+ * 2. **Dist_7d** = B3TR actually distributed to users this round, = sum of `totalRewardAmount` in
+ *    `b3tr_app_action_summaries_round` (same B3TR units, so the ratio is unit-consistent)
+ * 3. `DistributionEfficiency = min(Dist_7d / Alloc_7d, 1)`, or `0` when `Alloc_7d == 0`
+ * 4. `DistributionScore = PercentileRank(DistributionEfficiency)` across all dApps (with tie
+ *    handling), in `[0, 100]`
  */
 @Service
 @Profile("b3tr", "b3tr-app-round-score")
@@ -153,7 +164,7 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
         logger.info("Indexes ensured for collection {}", collectionName)
     }
 
-    data class AppMetrics(val actions: Long, val wau: Long)
+    data class AppMetrics(val actions: Long, val wau: Long, val distributedB3tr: BigDecimal)
 
     // ──────────────────────────── Entry point ────────────────────────────
 
@@ -178,6 +189,7 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
 
         val sourceCollection = IndexerNames.APP_ROUND_ACTION_SUMMARY.COLLECTION
         val firstSeenCollection = IndexerNames.USER_FIRST_SEEN.COLLECTION
+        val xAllocCollection = IndexerNames.X_ALLOC_RESULT.COLLECTION
         val targetCollection = IndexerNames.APP_ROUND_SCORE.COLLECTION
 
         val firstSeenAvailable = mongoTemplate.collectionExists(firstSeenCollection)
@@ -192,6 +204,7 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             scoreRound(
                 sourceCollection = sourceCollection,
                 firstSeenCollection = firstSeenCollection,
+                xAllocCollection = xAllocCollection,
                 targetCollection = targetCollection,
                 roundId = targetRound,
                 firstSeenAvailable = firstSeenAvailable,
@@ -209,6 +222,7 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
     private fun scoreRound(
         sourceCollection: String,
         firstSeenCollection: String,
+        xAllocCollection: String,
         targetCollection: String,
         roundId: Int,
         firstSeenAvailable: Boolean,
@@ -225,6 +239,9 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                 emptyMap()
             }
 
+        // 2b. Fetch B3TR allocations per app from x-allocation results (Alloc_7d)
+        val allocations = getAllocations(xAllocCollection, roundId)
+
         val allAppIds = appMetrics.keys
 
         // 3. Collect raw values for percentile computation (BigDecimal; exact for Long metrics)
@@ -236,6 +253,16 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
         val logAllWau = allWau.map { ln1pBig(it) }
         val logAllNewUsers = allNewUsers.map { ln1pBig(it) }
         val logAllActions = allActions.map { ln1pBig(it) }
+
+        // 3b. Pre-compute distribution efficiencies per app (population for percentile ranking)
+        val efficiencies =
+            allAppIds.associateWith { appId ->
+                distributionEfficiency(
+                    appMetrics[appId]?.distributedB3tr ?: BigDecimal.ZERO,
+                    allocations[appId] ?: BigDecimal.ZERO,
+                )
+            }
+        val allEfficiencies = efficiencies.values.toList()
 
         // 4. Build and persist per-app score documents
         val now = System.currentTimeMillis()
@@ -264,6 +291,12 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                     .add(WEIGHT_NEW_USERS.multiply(pNew))
                     .add(WEIGHT_ACTIONS.multiply(pAct))
 
+            // Distribution efficiency score (Appendix A.3)
+            val distB3tr = metrics.distributedB3tr
+            val allocB3tr = allocations[appId] ?: BigDecimal.ZERO
+            val distEff = efficiencies[appId] ?: BigDecimal.ZERO
+            val distScore = percentileRank(distEff, allEfficiencies)
+
             val id = "${appId}_$roundId"
             bulkOps.upsert(
                 Query(Criteria.where("_id").`is`(id)),
@@ -278,6 +311,10 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                     .set("pNewUsers", pNew.setScale(4, RoundingMode.HALF_UP))
                     .set("pActions", pAct.setScale(4, RoundingMode.HALF_UP))
                     .set("activityScore", activityScore.setScale(4, RoundingMode.HALF_UP))
+                    .set("allocB3tr", allocB3tr.setScale(6, RoundingMode.HALF_UP))
+                    .set("distributedB3tr", distB3tr.setScale(6, RoundingMode.HALF_UP))
+                    .set("distributionEfficiency", distEff.setScale(6, RoundingMode.HALF_UP))
+                    .set("distributionScore", distScore.setScale(4, RoundingMode.HALF_UP))
                     .set("updatedAt", now),
             )
             count++
@@ -296,6 +333,8 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
      * Groups by appId for a given round, producing:
      * - `actions` = sum of `actionsRewarded`
      * - `wau` = count of rows (= distinct users in this app+round)
+     * - `distributedB3tr` = sum of `totalRewardAmount` (= Dist_7d; already 18-decimal scaled to
+     *   B3TR units by the action-summary write path)
      */
     private fun aggregateAppMetrics(collection: String, roundId: Int): Map<String, AppMetrics> {
         val aggregation =
@@ -304,6 +343,8 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                 Aggregation.group("appId")
                     .sum("actionsRewarded")
                     .`as`("actions")
+                    .sum("totalRewardAmount")
+                    .`as`("distributedB3tr")
                     .count()
                     .`as`("wau"),
             )
@@ -314,10 +355,45 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             val appId = (doc["_id"] as? String)?.lowercase() ?: return@forEach
             val actions = toLong(doc.get("actions"))
             val wau = toLong(doc.get("wau"))
-            map[appId] = AppMetrics(actions = actions, wau = wau)
+            val distributedB3tr = toBigDecimal(doc.get("distributedB3tr"))
+            map[appId] = AppMetrics(actions = actions, wau = wau, distributedB3tr = distributedB3tr)
         }
         return map
     }
+
+    /**
+     * Reads per-app B3TR allocation (Alloc_7d) for a round from
+     * [b3tr_x_alloc_results][IndexerNames.X_ALLOC_RESULT], keyed by lower-cased `appId`.
+     * `totalAmount` is already 18-decimal scaled to B3TR units; a `null`/absent value (no rewards
+     * claimed yet) is treated as `0`.
+     */
+    private fun getAllocations(collection: String, roundId: Int): Map<String, BigDecimal> {
+        val results =
+            mongoTemplate.find(
+                Query(Criteria.where("roundId").`is`(roundId)),
+                Document::class.java,
+                collection,
+            )
+        val map = mutableMapOf<String, BigDecimal>()
+        for (doc in results) {
+            val appId = doc.getString("appId")?.lowercase() ?: continue
+            map[appId] = toBigDecimal(doc.get("totalAmount"))
+        }
+        return map
+    }
+
+    /**
+     * Distribution efficiency = `min(Dist_7d / Alloc_7d, 1)`, or `0` when `Alloc_7d == 0` (VBD
+     * Reputation Layer Proposal, Appendix A.3). Both inputs are in human B3TR units, so the ratio
+     * is unit-consistent. Result is in `[0, 1]`.
+     */
+    private fun distributionEfficiency(distributed: BigDecimal, allocated: BigDecimal): BigDecimal =
+        if (allocated.compareTo(BigDecimal.ZERO) > 0) {
+            val ratio = distributed.divide(allocated, COMPUTE_SCALE, RoundingMode.HALF_UP)
+            if (ratio.compareTo(BigDecimal.ONE) > 0) BigDecimal.ONE else ratio
+        } else {
+            BigDecimal.ZERO
+        }
 
     /** Counts new users per appId where `firstRoundId == roundId`. */
     private fun countNewUsers(collection: String, roundId: Int): Map<String, Long> {
@@ -343,4 +419,13 @@ private fun toLong(value: Any?): Long =
         is Int -> value.toLong()
         is Number -> value.toLong()
         else -> 0L
+    }
+
+private fun toBigDecimal(value: Any?): BigDecimal =
+    when (value) {
+        is BigDecimal -> value
+        // Decimal128 (MongoDB driver) and other Number subtypes carry the full-precision value in
+        // toString(), so round-tripping through the string avoids Double precision loss.
+        is Number -> BigDecimal(value.toString())
+        else -> BigDecimal.ZERO
     }
