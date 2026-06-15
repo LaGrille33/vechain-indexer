@@ -76,8 +76,13 @@ open class CommunityScoreService(private val mongoTemplate: MongoTemplate) {
             appDataList.add(data)
         }
 
-        // Percentile rank across all apps (reuses the shared mid-rank implementation)
-        val allAdjustedRatings = appDataList.map { it.adjustedRating }
+        // Percentile rank across eligible apps only (NumRatings >= R_MIN), per the Community Score
+        // spec: "Percentile Rank of AdjustedRating among all ELIGIBLE dApps". Ineligible apps get a
+        // score of 0 and must NOT dilute the ranking pool — otherwise every ineligible app added to
+        // the system inflates all eligible apps' scores. (reuses the shared mid-rank
+        // implementation)
+        val allAdjustedRatings =
+            appDataList.filter { it.numRatings >= R_MIN }.map { it.adjustedRating }
         for (data in appDataList) {
             data.communityScore =
                 if (data.numRatings < R_MIN) BigDecimal.ZERO
