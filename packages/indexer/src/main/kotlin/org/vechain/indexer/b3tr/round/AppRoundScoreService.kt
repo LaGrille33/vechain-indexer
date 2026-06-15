@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct
 import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
+import kotlin.math.exp
 import org.bson.Document
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
@@ -12,6 +13,7 @@ import org.springframework.data.domain.Sort
 import org.springframework.data.mongodb.core.BulkOperations
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.aggregation.Aggregation
+import org.springframework.data.mongodb.core.aggregation.ConditionalOperators
 import org.springframework.data.mongodb.core.index.Index
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
@@ -21,8 +23,8 @@ import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
 
 /**
- * Computes the **Activity Score** and **Distribution Efficiency Score** for each dApp per round, as
- * defined in the VBD Reputation Layer Proposal. Triggered by
+ * Computes the **Activity Score**, **Distribution Efficiency Score**, and **Community Score** for
+ * each dApp per round, as defined in the VBD Reputation Layer Proposal. Triggered by
  * [UserFirstSeenAggregationCompletedEvent] to ensure
  * [b3tr_user_first_seen][IndexerNames.USER_FIRST_SEEN] data is up-to-date.
  *
@@ -46,6 +48,19 @@ import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
  * 3. `DistributionEfficiency = min(Dist_7d / Alloc_7d, 1)`, or `0` when `Alloc_7d == 0`
  * 4. `DistributionScore = PercentileRank(DistributionEfficiency)` across all dApps (with tie
  *    handling), in `[0, 100]`
+ *
+ * ## Community Score algorithm (round-independent snapshot)
+ * Computed over the current rating/review state (no round filter) and merged into each scored app:
+ * 1. Aggregate `AvgRating` / `NumRatings` from [xapp_ratings][IndexerNames.XAPP_RATING], and
+ *    `HelpfulVotes` / `UnhelpfulVotes` from [xapp_review_votes][IndexerNames.XAPP_REVIEW_VOTE]
+ *    (joined to [xapp_reviews][IndexerNames.XAPP_REVIEW] on `reviewId`, excluding hidden reviews).
+ * 2. `ConfidenceFactor = 1 - e^(-NumRatings / K)`, `K = 100`.
+ * 3. `HelpfulRatio = HelpfulVotes / (HelpfulVotes + UnhelpfulVotes)` (`0.5` when no votes);
+ *    `EngagementFactor = 0.5 + 0.5 × HelpfulRatio`.
+ * 4. `AdjustedRating = AvgRating × ConfidenceFactor × EngagementFactor` (`0` when `NumRatings <
+ *    R_min`, `R_min = 20`).
+ * 5. `CommunityScore = PercentileRank(AdjustedRating)` across all apps with rating data (with tie
+ *    handling), in `[0, 100]`. Apps without rating data get `CommunityScore = 0`.
  */
 @Service
 @Profile("b3tr", "b3tr-app-round-score")
@@ -60,6 +75,11 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
 
         private val HUNDRED = BigDecimal("100")
         private val HALF = BigDecimal("0.5")
+
+        // Community Score constants (VBD Reputation Layer Proposal, Community Score)
+        private const val R_MIN = 20L // Minimum ratings to be eligible
+        private val K = BigDecimal("100") // Smoothing constant for ConfidenceFactor
+        private val COMMUNITY_MC = MathContext(20, RoundingMode.HALF_UP)
 
         // ln1pBig helpers
         private val TWO = BigDecimal(2)
@@ -264,6 +284,10 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             }
         val allEfficiencies = efficiencies.values.toList()
 
+        // 3c. Community Score — computed over the current rating/review state (round-independent),
+        // then merged into each scored app. Population is all apps with rating data.
+        val communityScores = computeCommunityScores()
+
         // 4. Build and persist per-app score documents
         val now = System.currentTimeMillis()
         val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, targetCollection)
@@ -297,6 +321,9 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             val distEff = efficiencies[appId] ?: BigDecimal.ZERO
             val distScore = percentileRank(distEff, allEfficiencies)
 
+            // Community Score (round-independent snapshot merged into this app's round document)
+            val community = communityScores[appId]
+
             val id = "${appId}_$roundId"
             bulkOps.upsert(
                 Query(Criteria.where("_id").`is`(id)),
@@ -315,6 +342,48 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
                     .set("distributedB3tr", distB3tr.setScale(6, RoundingMode.HALF_UP))
                     .set("distributionEfficiency", distEff.setScale(6, RoundingMode.HALF_UP))
                     .set("distributionScore", distScore.setScale(4, RoundingMode.HALF_UP))
+                    .set(
+                        "avgRating",
+                        (community?.avgRating ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
+                    )
+                    .set("numRatings", community?.numRatings ?: 0L)
+                    .set("helpfulVotes", community?.helpfulVotes ?: 0L)
+                    .set("unhelpfulVotes", community?.unhelpfulVotes ?: 0L)
+                    .set(
+                        "confidenceFactor",
+                        (community?.confidenceFactor ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "helpfulRatio",
+                        (community?.helpfulRatio ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "engagementFactor",
+                        (community?.engagementFactor ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "adjustedRating",
+                        (community?.adjustedRating ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "communityScore",
+                        (community?.communityScore ?: BigDecimal.ZERO).setScale(
+                            4,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
                     .set("updatedAt", now),
             )
             count++
@@ -410,6 +479,204 @@ class AppRoundScoreService(private val mongoTemplate: MongoTemplate) {
             map[appId] = toLong(doc.get("count"))
         }
         return map
+    }
+
+    // ──────────────────────────── Community Score ────────────────────────────
+
+    /** Community Score components for a single app, persisted into the round-score document. */
+    private data class CommunityScoreData(
+        val avgRating: BigDecimal,
+        val numRatings: Long,
+        val helpfulVotes: Long,
+        val unhelpfulVotes: Long,
+        val confidenceFactor: BigDecimal,
+        val helpfulRatio: BigDecimal,
+        val engagementFactor: BigDecimal,
+        val adjustedRating: BigDecimal,
+        val communityScore: BigDecimal,
+    )
+
+    private data class CommunityRatingStats(
+        val appId: String,
+        val avgRating: BigDecimal,
+        val numRatings: Long,
+    )
+
+    private data class CommunityVoteStats(
+        val appId: String,
+        val helpfulVotes: Long,
+        val unhelpfulVotes: Long,
+    )
+
+    private class CommunityAppData(
+        val appId: String,
+        val avgRating: BigDecimal,
+        val numRatings: Long,
+        val helpfulVotes: Long,
+        val unhelpfulVotes: Long,
+        var adjustedRating: BigDecimal = BigDecimal.ZERO,
+        var communityScore: BigDecimal = BigDecimal.ZERO,
+    )
+
+    /**
+     * Computes the Community Score for every app that has rating data (VBD Reputation Layer
+     * Proposal, Community Score). This is a pure calculation over the current rating/review state
+     * with no round dependency; the population for percentile ranking is all apps with rating data.
+     * Returns a map keyed by lower-cased `appId` so it can be merged into the round-score documents
+     * (whose appIds are also lower-cased).
+     */
+    private fun computeCommunityScores(): Map<String, CommunityScoreData> {
+        val ratingStats = aggregateCommunityRatingStats()
+        if (ratingStats.isEmpty()) return emptyMap()
+
+        val voteStats = aggregateCommunityVoteStats()
+
+        // Compute adjusted rating for each app with rating data
+        val appDataList = mutableListOf<CommunityAppData>()
+        for (rs in ratingStats.values) {
+            val vs = voteStats[rs.appId]
+            val data =
+                CommunityAppData(
+                    appId = rs.appId,
+                    avgRating = rs.avgRating,
+                    numRatings = rs.numRatings,
+                    helpfulVotes = vs?.helpfulVotes ?: 0L,
+                    unhelpfulVotes = vs?.unhelpfulVotes ?: 0L,
+                )
+            data.adjustedRating = computeAdjustedRating(data)
+            appDataList.add(data)
+        }
+
+        // Percentile rank across all apps (reuses the shared mid-rank implementation)
+        val allAdjustedRatings = appDataList.map { it.adjustedRating }
+        for (data in appDataList) {
+            data.communityScore =
+                if (data.numRatings < R_MIN) BigDecimal.ZERO
+                else percentileRank(data.adjustedRating, allAdjustedRatings)
+        }
+
+        return appDataList.associateBy(
+            keySelector = { it.appId },
+            valueTransform = { data ->
+                val helpfulRatio = computeHelpfulRatio(data.helpfulVotes, data.unhelpfulVotes)
+                CommunityScoreData(
+                    avgRating = data.avgRating,
+                    numRatings = data.numRatings,
+                    helpfulVotes = data.helpfulVotes,
+                    unhelpfulVotes = data.unhelpfulVotes,
+                    confidenceFactor = computeConfidenceFactor(data.numRatings),
+                    helpfulRatio = helpfulRatio,
+                    engagementFactor = computeEngagementFactor(helpfulRatio),
+                    adjustedRating = data.adjustedRating,
+                    communityScore = data.communityScore,
+                )
+            },
+        )
+    }
+
+    private fun aggregateCommunityRatingStats(): Map<String, CommunityRatingStats> {
+        val collection = IndexerNames.XAPP_RATING.COLLECTION
+        if (!mongoTemplate.collectionExists(collection)) return emptyMap()
+
+        val aggregation =
+            Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("_id").ne(null)),
+                Aggregation.group("appId").count().`as`("count").avg("rating").`as`("average"),
+            )
+
+        val results = mongoTemplate.aggregate(aggregation, collection, Document::class.java)
+        val map = mutableMapOf<String, CommunityRatingStats>()
+        results.forEach { doc ->
+            val appId = (doc["_id"] as? String)?.lowercase() ?: return@forEach
+            val count = toLong(doc.get("count"))
+            val average = BigDecimal.valueOf((doc.get("average") as? Number)?.toDouble() ?: 0.0)
+            map[appId] =
+                CommunityRatingStats(appId = appId, avgRating = average, numRatings = count)
+        }
+        return map
+    }
+
+    private fun aggregateCommunityVoteStats(): Map<String, CommunityVoteStats> {
+        val collection = IndexerNames.XAPP_REVIEW_VOTE.COLLECTION
+        if (!mongoTemplate.collectionExists(collection)) return emptyMap()
+
+        val aggregation =
+            Aggregation.newAggregation(
+                // Join votes with reviews to get appId and check isHidden
+                Aggregation.lookup(
+                    IndexerNames.XAPP_REVIEW.COLLECTION,
+                    "reviewId",
+                    "reviewId",
+                    "review",
+                ),
+                Aggregation.unwind("review"),
+                Aggregation.match(Criteria.where("review.isHidden").`is`(false)),
+                // voteType 1 = upvote (helpful), 2 = downvote (unhelpful)
+                Aggregation.group("review.appId")
+                    .sum(
+                        ConditionalOperators.`when`(Criteria.where("voteType").`is`(1))
+                            .then(1)
+                            .otherwise(0)
+                    )
+                    .`as`("helpfulVotes")
+                    .sum(
+                        ConditionalOperators.`when`(Criteria.where("voteType").`is`(2))
+                            .then(1)
+                            .otherwise(0)
+                    )
+                    .`as`("unhelpfulVotes"),
+            )
+
+        val results = mongoTemplate.aggregate(aggregation, collection, Document::class.java)
+        val map = mutableMapOf<String, CommunityVoteStats>()
+        results.forEach { doc ->
+            val appId = (doc["_id"] as? String)?.lowercase() ?: return@forEach
+            val helpful = toLong(doc.get("helpfulVotes"))
+            val unhelpful = toLong(doc.get("unhelpfulVotes"))
+            map[appId] =
+                CommunityVoteStats(
+                    appId = appId,
+                    helpfulVotes = helpful,
+                    unhelpfulVotes = unhelpful,
+                )
+        }
+        return map
+    }
+
+    /**
+     * ConfidenceFactor = 1 - e^(-NumRatings / K). The exponential is transcendental, so it is
+     * evaluated via Double then wrapped in BigDecimal to preserve all remaining arithmetic.
+     */
+    private fun computeConfidenceFactor(numRatings: Long): BigDecimal {
+        val exponent = -numRatings.toDouble() / K.toDouble()
+        return BigDecimal.ONE.subtract(exp(exponent).toBigDecimal(), COMMUNITY_MC)
+    }
+
+    /** HelpfulRatio = helpfulVotes / (helpfulVotes + unhelpfulVotes), default 0.5 if no votes. */
+    private fun computeHelpfulRatio(helpfulVotes: Long, unhelpfulVotes: Long): BigDecimal {
+        val total = helpfulVotes + unhelpfulVotes
+        return if (total == 0L) {
+            BigDecimal("0.5")
+        } else {
+            BigDecimal(helpfulVotes).divide(BigDecimal(total), COMMUNITY_MC)
+        }
+    }
+
+    /** EngagementFactor = 0.5 + 0.5 * HelpfulRatio, range [0.5, 1.0] */
+    private fun computeEngagementFactor(helpfulRatio: BigDecimal): BigDecimal =
+        BigDecimal("0.5").add(BigDecimal("0.5").multiply(helpfulRatio, COMMUNITY_MC), COMMUNITY_MC)
+
+    /**
+     * AdjustedRating = AvgRating * ConfidenceFactor * EngagementFactor (0 when NumRatings < R_min).
+     */
+    private fun computeAdjustedRating(data: CommunityAppData): BigDecimal {
+        if (data.numRatings < R_MIN) return BigDecimal.ZERO
+        val confidenceFactor = computeConfidenceFactor(data.numRatings)
+        val helpfulRatio = computeHelpfulRatio(data.helpfulVotes, data.unhelpfulVotes)
+        val engagementFactor = computeEngagementFactor(helpfulRatio)
+        return data.avgRating
+            .multiply(confidenceFactor, COMMUNITY_MC)
+            .multiply(engagementFactor, COMMUNITY_MC)
     }
 }
 
