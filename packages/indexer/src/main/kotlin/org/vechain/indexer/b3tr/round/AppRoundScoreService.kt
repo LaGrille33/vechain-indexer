@@ -38,11 +38,12 @@ import org.vechain.indexer.utils.ContractUtils
  *
  * ## App set per round
  * The set of apps scored for a round is the authoritative on-chain list from
- * `XAllocationVoting.getAppIdsOfRound(roundId)` — not the apps that happen to have action data.
- * Apps on chain for the round but with no action-summary data are still scored, with every score
- * (activity, distribution, community) set to `0` (rating-derived fields are still persisted for
- * reference). Percentile populations are restricted to apps that have data, so zero-data apps never
- * inflate a no-data app's rank.
+ * `XAllocationVoting.getAppIdsOfRound(roundId)` — not just the apps that happen to have action
+ * data. The full on-chain set is also the percentile population for the activity and distribution
+ * scores: apps without action data contribute `0` to every metric, forming the baseline that active
+ * apps rank above (and they themselves are percentile-ranked at the bottom). This keeps scores
+ * meaningful even when only a few apps have activity. Community Score is still computed
+ * independently over all apps with rating data.
  *
  * ## Activity Score algorithm
  * For each round, per dApp:
@@ -280,14 +281,15 @@ class AppRoundScoreService(
         firstSeenAvailable: Boolean,
     ): Int {
         // 0. Authoritative app list for this round comes from the XAllocationVoting contract
-        //    (getAppIdsOfRound). Apps that are on chain for this round but have no action-summary
-        //    data are still scored, with every score set to 0 (see the loop below).
+        //    (getAppIdsOfRound). The full set — including apps with no action data — is scored and
+        //    forms the percentile population (see below).
         val onChainAppIds = fetchAppIdsOfRound(roundId)
         if (onChainAppIds.isEmpty()) {
-            logger.warn(
+            logger.info(
                 "No apps returned by getAppIdsOfRound for round {} (chain error or empty round); skipping",
                 roundId,
             )
+            // No apps to score → nothing to persist → skip the round.
             return 0
         }
 
@@ -305,16 +307,15 @@ class AppRoundScoreService(
         // 2b. Fetch B3TR allocations per app from x-allocation results (Alloc_7d)
         val allocations = getAllocations(xAllocCollection, roundId)
 
-        // Apps that have action data this round. Percentile populations are restricted to these so
-        // that zero-data apps (force-scored to 0 in the loop) do not pollute the distribution —
-        // otherwise a no-data app could receive a non-zero percentile rank (e.g. NewUsers, where a
-        // data app may legitimately have 0 new users).
-        val scoredWithData = onChainAppIds.filter { appMetrics.containsKey(it) }
+        // The percentile population is the FULL on-chain app set for the round. Apps without
+        // action-summary data contribute 0 to every metric, so they form the baseline that active
+        // apps rank above — and they themselves are percentile-ranked at the bottom. This keeps
+        // scores meaningful even when only a few apps have activity.
 
         // 3. Collect raw values for percentile computation (BigDecimal; exact for Long metrics)
-        val allWau = scoredWithData.map { BigDecimal(appMetrics[it]!!.wau) }
-        val allNewUsers = scoredWithData.map { BigDecimal(newUsersData[it] ?: 0L) }
-        val allActions = scoredWithData.map { BigDecimal(appMetrics[it]!!.actions) }
+        val allWau = onChainAppIds.map { BigDecimal(appMetrics[it]?.wau ?: 0L) }
+        val allNewUsers = onChainAppIds.map { BigDecimal(newUsersData[it] ?: 0L) }
+        val allActions = onChainAppIds.map { BigDecimal(appMetrics[it]?.actions ?: 0L) }
 
         // Pre-compute log-scaled values once (BigDecimal ln1p), reused for every app's ranking
         val logAllWau = allWau.map { ln1pBig(it) }
@@ -323,9 +324,9 @@ class AppRoundScoreService(
 
         // 3b. Pre-compute distribution efficiencies per app (population for percentile ranking)
         val efficiencies =
-            scoredWithData.associateWith { appId ->
+            onChainAppIds.associateWith { appId ->
                 distributionEfficiency(
-                    appMetrics[appId]!!.distributedB3tr,
+                    appMetrics[appId]?.distributedB3tr ?: BigDecimal.ZERO,
                     allocations[appId] ?: BigDecimal.ZERO,
                 )
             }
@@ -342,18 +343,11 @@ class AppRoundScoreService(
 
         for (appId in onChainAppIds) {
             val metrics = appMetrics[appId]
-            if (metrics == null) {
-                // No action data this round → every score is 0. Rating-derived fields are still
-                // persisted for reference, but communityScore is forced to 0.
-                upsertZeroScoreRow(appId, roundId, communityScores[appId], now, bulkOps)
-                count++
-                continue
-            }
 
-            // Log scaling (BigDecimal throughout)
-            val logWau = ln1pBig(BigDecimal(metrics.wau))
+            // Log scaling (BigDecimal throughout); apps without data contribute ln(1 + 0) = 0
+            val logWau = ln1pBig(BigDecimal(metrics?.wau ?: 0L))
             val logNew = ln1pBig(BigDecimal(newUsersData[appId] ?: 0L))
-            val logAct = ln1pBig(BigDecimal(metrics.actions))
+            val logAct = ln1pBig(BigDecimal(metrics?.actions ?: 0L))
 
             // Percentile ranks with tie handling (BigDecimal comparisons — exact ties)
             val pWau = percentileRank(logWau, logAllWau)
@@ -370,7 +364,7 @@ class AppRoundScoreService(
                     .add(WEIGHT_ACTIONS.multiply(pAct))
 
             // Distribution efficiency score (Appendix A.3)
-            val distB3tr = metrics.distributedB3tr
+            val distB3tr = metrics?.distributedB3tr ?: BigDecimal.ZERO
             val allocB3tr = allocations[appId] ?: BigDecimal.ZERO
             val distEff = efficiencies[appId] ?: BigDecimal.ZERO
             val distScore = percentileRank(distEff, allEfficiencies)
@@ -385,9 +379,9 @@ class AppRoundScoreService(
                     .set("_id", id)
                     .set("appId", appId)
                     .set("roundId", roundId)
-                    .set("wau", metrics.wau)
+                    .set("wau", metrics?.wau ?: 0L)
                     .set("newUsers", newUsersData[appId] ?: 0L)
-                    .set("actions", metrics.actions)
+                    .set("actions", metrics?.actions ?: 0L)
                     .set("pWau", pWau.setScale(4, RoundingMode.HALF_UP))
                     .set("pNewUsers", pNew.setScale(4, RoundingMode.HALF_UP))
                     .set("pActions", pAct.setScale(4, RoundingMode.HALF_UP))
@@ -492,70 +486,6 @@ class AppRoundScoreService(
         }
         val hex = value.lowercase()
         return if (hex.startsWith("0x")) hex else "0x$hex"
-    }
-
-    /**
-     * Persists an all-zero score row for an on-chain app that has no action-summary data this
-     * round. Rating-derived fields are still written for reference when available, but every score
-     * (activity, distribution, community) is `0`.
-     */
-    private fun upsertZeroScoreRow(
-        appId: String,
-        roundId: Int,
-        community: CommunityScoreData?,
-        now: Long,
-        bulkOps: BulkOperations,
-    ) {
-        val id = "${appId}_$roundId"
-        bulkOps.upsert(
-            Query(Criteria.where("_id").`is`(id)),
-            Update()
-                .set("_id", id)
-                .set("appId", appId)
-                .set("roundId", roundId)
-                .set("wau", 0L)
-                .set("newUsers", 0L)
-                .set("actions", 0L)
-                .set("pWau", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("pNewUsers", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("pActions", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("activityScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("allocB3tr", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributedB3tr", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributionEfficiency", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributionScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set(
-                    "avgRating",
-                    (community?.avgRating ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
-                )
-                .set("numRatings", community?.numRatings ?: 0L)
-                .set("helpfulVotes", community?.helpfulVotes ?: 0L)
-                .set("unhelpfulVotes", community?.unhelpfulVotes ?: 0L)
-                .set(
-                    "confidenceFactor",
-                    (community?.confidenceFactor ?: BigDecimal.ZERO).setScale(
-                        6,
-                        RoundingMode.HALF_UP,
-                    ),
-                )
-                .set(
-                    "helpfulRatio",
-                    (community?.helpfulRatio ?: BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP),
-                )
-                .set(
-                    "engagementFactor",
-                    (community?.engagementFactor ?: BigDecimal.ZERO).setScale(
-                        6,
-                        RoundingMode.HALF_UP,
-                    ),
-                )
-                .set(
-                    "adjustedRating",
-                    (community?.adjustedRating ?: BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP),
-                )
-                .set("communityScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("updatedAt", now),
-        )
     }
 
     // ──────────────────────────── Aggregation helpers ────────────────────────────
