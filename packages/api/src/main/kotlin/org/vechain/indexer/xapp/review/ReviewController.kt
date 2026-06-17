@@ -58,12 +58,12 @@ open class ReviewController(private val service: ReviewApiService) {
         val sortFields =
             when (normalizedSort) {
                 "upvotes",
-                "most_upvotes" -> arrayOf("upvotes", "blockTimestamp")
+                "most_upvotes" -> arrayOf("upvotes", "createdAt")
                 "downvotes",
-                "most_downvotes" -> arrayOf("downvotes", "blockTimestamp")
+                "most_downvotes" -> arrayOf("downvotes", "createdAt")
                 "reports",
-                "most_reports" -> arrayOf("reports", "blockTimestamp")
-                else -> arrayOf("blockTimestamp")
+                "most_reports" -> arrayOf("reports", "createdAt")
+                else -> arrayOf("createdAt")
             }
         val finalDirection =
             if (

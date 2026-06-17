@@ -39,6 +39,22 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "rater",
+        "type": "address"
+      }
+    ],
+    "name": "AlreadyRated",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "reviewId",
         "type": "uint256"
@@ -55,22 +71,6 @@
       }
     ],
     "name": "AlreadyVoted",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "rater",
-        "type": "address"
-      }
-    ],
-    "name": "AlreadyRated",
     "type": "error"
   },
   {
@@ -138,6 +138,22 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "NotEligible",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "NotInitializing",
     "type": "error"
@@ -156,6 +172,11 @@
       }
     ],
     "name": "NotReviewAuthor",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PassportNotSet",
     "type": "error"
   },
   {
@@ -234,6 +255,56 @@
       }
     ],
     "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "rater",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "rating",
+        "type": "uint8"
+      }
+    ],
+    "name": "RatingSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "rater",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "rating",
+        "type": "uint8"
+      }
+    ],
+    "name": "RatingUpdated",
     "type": "event"
   },
   {
@@ -414,6 +485,19 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "contract IVeBetterPassport",
+        "name": "passport",
+        "type": "address"
+      }
+    ],
+    "name": "VeBetterPassportUpdated",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "AUTO_HIDE_REPORT_THRESHOLD",
     "outputs": [
@@ -590,26 +674,7 @@
         "type": "bytes32"
       }
     ],
-    "name": "getAppReviewIds",
-    "outputs": [
-      {
-        "internalType": "uint256[]",
-        "name": "",
-        "type": "uint256[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "getAppReviewStats",
+    "name": "getAppRatingStats",
     "outputs": [
       {
         "internalType": "uint256",
@@ -633,7 +698,26 @@
         "type": "bytes32"
       }
     ],
-    "name": "getAppRatingStats",
+    "name": "getAppReviewIds",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getAppReviewStats",
     "outputs": [
       {
         "internalType": "uint256",
@@ -752,25 +836,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "getUserReviewIds",
-    "outputs": [
-      {
-        "internalType": "uint256[]",
-        "name": "",
-        "type": "uint256[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "bytes32",
         "name": "appId",
         "type": "bytes32"
@@ -787,6 +852,25 @@
         "internalType": "uint8",
         "name": "",
         "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserReviewIds",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -964,6 +1048,37 @@
   {
     "inputs": [
       {
+        "internalType": "contract IVeBetterPassport",
+        "name": "_veBetterPassport",
+        "type": "address"
+      }
+    ],
+    "name": "setVeBetterPassport",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "rating",
+        "type": "uint8"
+      }
+    ],
+    "name": "submitRating",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes4",
         "name": "interfaceId",
         "type": "bytes4"
@@ -1009,6 +1124,24 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "appId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "rating",
+        "type": "uint8"
+      }
+    ],
+    "name": "updateRating",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "newImplementation",
         "type": "address"
@@ -1022,6 +1155,19 @@
     "name": "upgradeToAndCall",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "veBetterPassport",
+    "outputs": [
+      {
+        "internalType": "contract IVeBetterPassport",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1051,92 +1197,6 @@
       }
     ],
     "name": "voteOnReview",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "rater",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "rating",
-        "type": "uint8"
-      }
-    ],
-    "name": "RatingSubmitted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "rater",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "rating",
-        "type": "uint8"
-      }
-    ],
-    "name": "RatingUpdated",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "uint8",
-        "name": "rating",
-        "type": "uint8"
-      }
-    ],
-    "name": "submitRating",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "appId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "uint8",
-        "name": "rating",
-        "type": "uint8"
-      }
-    ],
-    "name": "updateRating",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
