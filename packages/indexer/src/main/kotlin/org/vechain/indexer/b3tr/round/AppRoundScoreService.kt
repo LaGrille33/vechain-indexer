@@ -31,18 +31,19 @@ import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.utils.ContractUtils
 
 /**
- * Computes the **Activity Score**, **Distribution Efficiency Score**, and **Community Score** for
- * each dApp per round, as defined in the VBD Reputation Layer Proposal. Triggered by
- * [UserFirstSeenAggregationCompletedEvent] to ensure
+ * Computes the **Activity Score**, **Distribution Efficiency Score**, **Community Score**,
+ * **Profile Score**, and the composite **Total Score** for each dApp per round, as defined in the
+ * VBD Reputation Layer Proposal. Triggered by [UserFirstSeenAggregationCompletedEvent] to ensure
  * [b3tr_user_first_seen][IndexerNames.USER_FIRST_SEEN] data is up-to-date.
  *
  * ## App set per round
  * The set of apps scored for a round is the authoritative on-chain list from
- * `XAllocationVoting.getAppIdsOfRound(roundId)` — not the apps that happen to have action data.
- * Apps on chain for the round but with no action-summary data are still scored, with every score
- * (activity, distribution, community) set to `0` (rating-derived fields are still persisted for
- * reference). Percentile populations are restricted to apps that have data, so zero-data apps never
- * inflate a no-data app's rank.
+ * `XAllocationVoting.getAppIdsOfRound(roundId)` — not just the apps that happen to have action
+ * data. The full on-chain set is also the percentile population for the activity and distribution
+ * scores: apps without action data contribute `0` to every metric, forming the baseline that active
+ * apps rank above (and they themselves are percentile-ranked at the bottom). This keeps scores
+ * meaningful even when only a few apps have activity. Community Score is still computed
+ * independently over all apps with rating data.
  *
  * ## Activity Score algorithm
  * For each round, per dApp:
@@ -77,6 +78,24 @@ import org.vechain.indexer.utils.ContractUtils
  *    R_min`, `R_min = 20`).
  * 5. `CommunityScore = PercentileRank(AdjustedRating)` across all apps with rating data (with tie
  *    handling), in `[0, 100]`. Apps without rating data get `CommunityScore = 0`.
+ *
+ * ## Profile Score algorithm (round-independent snapshot)
+ * Computed from [xapp_metadata][IndexerNames.XAPP_METADATA] for the on-chain app set — the latest
+ * snapshot plus the inline `_previousVersions` history — and merged into each scored app:
+ * 1. `StaticScore = optionalFieldsCount / 7 × 100` (completeness of the 7 optional metadata fields,
+ *    from the latest snapshot).
+ * 2. `ProductRecency` / `SocialRecency ∈ {0, 0.5, 1.0}`: days since the most recent snapshot whose
+ *    `versionHistoryUpdated` / `tweetsUpdated` flag is `1` (≤14d → 1.0, 14–30d → 0.5, >30d → 0).
+ *    The update flags are precomputed at write time (see `AppMetadataService`); a content type
+ *    whose flag never fired is treated as never updated → recency `0`.
+ * 3. `RecencyFactor = (ProductRecency + SocialRecency) / 2`.
+ * 4. `ProfileScore = StaticScore × (0.8 + 0.2 × RecencyFactor)`, in `[0, 100]`. Apps without a
+ *    metadata document get `ProfileScore = 0`.
+ *
+ * ## Total Score algorithm
+ * Composite of the four dimension scores, persisted as `totalScore`: `TotalScore = 0.3 ×
+ * ActivityScore + 0.3 × DistributionScore + 0.3 × CommunityScore + 0.1 × ProfileScore`, in `[0,
+ * 100]`.
  */
 @Service
 @Profile("b3tr", "b3tr-app-round-score")
@@ -112,6 +131,23 @@ class AppRoundScoreService(
         private const val R_MIN = 20L // Minimum ratings to be eligible
         private val K = BigDecimal("100") // Smoothing constant for ConfidenceFactor
         private val COMMUNITY_MC = MathContext(20, RoundingMode.HALF_UP)
+
+        // Profile Score constants (VBD Reputation Layer Proposal, Profile Score)
+        private val OPTIONAL_FIELDS_TOTAL =
+            BigDecimal(7) // total optional metadata fields (M_total)
+        private val PROFILE_BASE_WEIGHT = BigDecimal("0.8") // completeness absolute weight
+        private val PROFILE_RECENCY_WEIGHT = BigDecimal("0.2") // recency modulation weight
+        private const val MILLIS_PER_SECOND = 1000L
+        private const val MILLIS_PER_DAY = 86_400_000L
+        private const val RECENCY_DAYS_FULL = 14L // ≤14d → recency 1.0
+        private const val RECENCY_DAYS_PARTIAL = 30L // 14–30d → recency 0.5
+        private const val PREVIOUS_VERSIONS_FIELD = "_previousVersions"
+
+        // Total Score weights (VBD Reputation Layer Proposal, Total Score)
+        private val WEIGHT_ACTIVITY = BigDecimal("0.3")
+        private val WEIGHT_DISTRIBUTION = BigDecimal("0.3")
+        private val WEIGHT_COMMUNITY = BigDecimal("0.3")
+        private val WEIGHT_PROFILE = BigDecimal("0.1")
 
         // ln1pBig helpers
         private val TWO = BigDecimal(2)
@@ -280,14 +316,15 @@ class AppRoundScoreService(
         firstSeenAvailable: Boolean,
     ): Int {
         // 0. Authoritative app list for this round comes from the XAllocationVoting contract
-        //    (getAppIdsOfRound). Apps that are on chain for this round but have no action-summary
-        //    data are still scored, with every score set to 0 (see the loop below).
+        //    (getAppIdsOfRound). The full set — including apps with no action data — is scored and
+        //    forms the percentile population (see below).
         val onChainAppIds = fetchAppIdsOfRound(roundId)
         if (onChainAppIds.isEmpty()) {
-            logger.warn(
+            logger.info(
                 "No apps returned by getAppIdsOfRound for round {} (chain error or empty round); skipping",
                 roundId,
             )
+            // No apps to score → nothing to persist → skip the round.
             return 0
         }
 
@@ -305,16 +342,15 @@ class AppRoundScoreService(
         // 2b. Fetch B3TR allocations per app from x-allocation results (Alloc_7d)
         val allocations = getAllocations(xAllocCollection, roundId)
 
-        // Apps that have action data this round. Percentile populations are restricted to these so
-        // that zero-data apps (force-scored to 0 in the loop) do not pollute the distribution —
-        // otherwise a no-data app could receive a non-zero percentile rank (e.g. NewUsers, where a
-        // data app may legitimately have 0 new users).
-        val scoredWithData = onChainAppIds.filter { appMetrics.containsKey(it) }
+        // The percentile population is the FULL on-chain app set for the round. Apps without
+        // action-summary data contribute 0 to every metric, so they form the baseline that active
+        // apps rank above — and they themselves are percentile-ranked at the bottom. This keeps
+        // scores meaningful even when only a few apps have activity.
 
         // 3. Collect raw values for percentile computation (BigDecimal; exact for Long metrics)
-        val allWau = scoredWithData.map { BigDecimal(appMetrics[it]!!.wau) }
-        val allNewUsers = scoredWithData.map { BigDecimal(newUsersData[it] ?: 0L) }
-        val allActions = scoredWithData.map { BigDecimal(appMetrics[it]!!.actions) }
+        val allWau = onChainAppIds.map { BigDecimal(appMetrics[it]?.wau ?: 0L) }
+        val allNewUsers = onChainAppIds.map { BigDecimal(newUsersData[it] ?: 0L) }
+        val allActions = onChainAppIds.map { BigDecimal(appMetrics[it]?.actions ?: 0L) }
 
         // Pre-compute log-scaled values once (BigDecimal ln1p), reused for every app's ranking
         val logAllWau = allWau.map { ln1pBig(it) }
@@ -323,9 +359,9 @@ class AppRoundScoreService(
 
         // 3b. Pre-compute distribution efficiencies per app (population for percentile ranking)
         val efficiencies =
-            scoredWithData.associateWith { appId ->
+            onChainAppIds.associateWith { appId ->
                 distributionEfficiency(
-                    appMetrics[appId]!!.distributedB3tr,
+                    appMetrics[appId]?.distributedB3tr ?: BigDecimal.ZERO,
                     allocations[appId] ?: BigDecimal.ZERO,
                 )
             }
@@ -335,6 +371,11 @@ class AppRoundScoreService(
         // then merged into each scored app. Population is all apps with rating data.
         val communityScores = computeCommunityScores()
 
+        // 3d. Profile Score — computed from xapp_metadata for the on-chain app set
+        // (round-independent snapshot), then merged into each scored app. Population is the apps
+        // that have a metadata document.
+        val profileScores = computeProfileScores(onChainAppIds)
+
         // 4. Build and persist per-app score documents
         val now = System.currentTimeMillis()
         val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, targetCollection)
@@ -342,18 +383,11 @@ class AppRoundScoreService(
 
         for (appId in onChainAppIds) {
             val metrics = appMetrics[appId]
-            if (metrics == null) {
-                // No action data this round → every score is 0. Rating-derived fields are still
-                // persisted for reference, but communityScore is forced to 0.
-                upsertZeroScoreRow(appId, roundId, communityScores[appId], now, bulkOps)
-                count++
-                continue
-            }
 
-            // Log scaling (BigDecimal throughout)
-            val logWau = ln1pBig(BigDecimal(metrics.wau))
+            // Log scaling (BigDecimal throughout); apps without data contribute ln(1 + 0) = 0
+            val logWau = ln1pBig(BigDecimal(metrics?.wau ?: 0L))
             val logNew = ln1pBig(BigDecimal(newUsersData[appId] ?: 0L))
-            val logAct = ln1pBig(BigDecimal(metrics.actions))
+            val logAct = ln1pBig(BigDecimal(metrics?.actions ?: 0L))
 
             // Percentile ranks with tie handling (BigDecimal comparisons — exact ties)
             val pWau = percentileRank(logWau, logAllWau)
@@ -370,13 +404,35 @@ class AppRoundScoreService(
                     .add(WEIGHT_ACTIONS.multiply(pAct))
 
             // Distribution efficiency score (Appendix A.3)
-            val distB3tr = metrics.distributedB3tr
+            val distB3tr = metrics?.distributedB3tr ?: BigDecimal.ZERO
             val allocB3tr = allocations[appId] ?: BigDecimal.ZERO
             val distEff = efficiencies[appId] ?: BigDecimal.ZERO
             val distScore = percentileRank(distEff, allEfficiencies)
 
             // Community Score (round-independent snapshot merged into this app's round document)
             val community = communityScores[appId]
+
+            // Profile Score (round-independent snapshot merged into this app's round document)
+            val profile = profileScores[appId]
+
+            // Total Score (VBD Reputation Layer Proposal, Total Score)
+            val totalScore =
+                WEIGHT_ACTIVITY.multiply(activityScore, COMMUNITY_MC)
+                    .add(WEIGHT_DISTRIBUTION.multiply(distScore, COMMUNITY_MC), COMMUNITY_MC)
+                    .add(
+                        WEIGHT_COMMUNITY.multiply(
+                            community?.communityScore ?: BigDecimal.ZERO,
+                            COMMUNITY_MC,
+                        ),
+                        COMMUNITY_MC,
+                    )
+                    .add(
+                        WEIGHT_PROFILE.multiply(
+                            profile?.profileScore ?: BigDecimal.ZERO,
+                            COMMUNITY_MC,
+                        ),
+                        COMMUNITY_MC,
+                    )
 
             val id = "${appId}_$roundId"
             bulkOps.upsert(
@@ -385,9 +441,9 @@ class AppRoundScoreService(
                     .set("_id", id)
                     .set("appId", appId)
                     .set("roundId", roundId)
-                    .set("wau", metrics.wau)
+                    .set("wau", metrics?.wau ?: 0L)
                     .set("newUsers", newUsersData[appId] ?: 0L)
-                    .set("actions", metrics.actions)
+                    .set("actions", metrics?.actions ?: 0L)
                     .set("pWau", pWau.setScale(4, RoundingMode.HALF_UP))
                     .set("pNewUsers", pNew.setScale(4, RoundingMode.HALF_UP))
                     .set("pActions", pAct.setScale(4, RoundingMode.HALF_UP))
@@ -438,6 +494,37 @@ class AppRoundScoreService(
                             RoundingMode.HALF_UP,
                         ),
                     )
+                    .set("optionalFieldsCount", profile?.optionalFieldsCount ?: 0)
+                    .set(
+                        "staticScore",
+                        (profile?.staticScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
+                    )
+                    .set(
+                        "productRecency",
+                        (profile?.productRecency ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "socialRecency",
+                        (profile?.socialRecency ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "recencyFactor",
+                        (profile?.recencyFactor ?: BigDecimal.ZERO).setScale(
+                            6,
+                            RoundingMode.HALF_UP,
+                        ),
+                    )
+                    .set(
+                        "profileScore",
+                        (profile?.profileScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
+                    )
+                    .set("totalScore", totalScore.setScale(4, RoundingMode.HALF_UP))
                     .set("updatedAt", now),
             )
             count++
@@ -492,70 +579,6 @@ class AppRoundScoreService(
         }
         val hex = value.lowercase()
         return if (hex.startsWith("0x")) hex else "0x$hex"
-    }
-
-    /**
-     * Persists an all-zero score row for an on-chain app that has no action-summary data this
-     * round. Rating-derived fields are still written for reference when available, but every score
-     * (activity, distribution, community) is `0`.
-     */
-    private fun upsertZeroScoreRow(
-        appId: String,
-        roundId: Int,
-        community: CommunityScoreData?,
-        now: Long,
-        bulkOps: BulkOperations,
-    ) {
-        val id = "${appId}_$roundId"
-        bulkOps.upsert(
-            Query(Criteria.where("_id").`is`(id)),
-            Update()
-                .set("_id", id)
-                .set("appId", appId)
-                .set("roundId", roundId)
-                .set("wau", 0L)
-                .set("newUsers", 0L)
-                .set("actions", 0L)
-                .set("pWau", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("pNewUsers", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("pActions", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("activityScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("allocB3tr", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributedB3tr", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributionEfficiency", BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP))
-                .set("distributionScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set(
-                    "avgRating",
-                    (community?.avgRating ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
-                )
-                .set("numRatings", community?.numRatings ?: 0L)
-                .set("helpfulVotes", community?.helpfulVotes ?: 0L)
-                .set("unhelpfulVotes", community?.unhelpfulVotes ?: 0L)
-                .set(
-                    "confidenceFactor",
-                    (community?.confidenceFactor ?: BigDecimal.ZERO).setScale(
-                        6,
-                        RoundingMode.HALF_UP,
-                    ),
-                )
-                .set(
-                    "helpfulRatio",
-                    (community?.helpfulRatio ?: BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP),
-                )
-                .set(
-                    "engagementFactor",
-                    (community?.engagementFactor ?: BigDecimal.ZERO).setScale(
-                        6,
-                        RoundingMode.HALF_UP,
-                    ),
-                )
-                .set(
-                    "adjustedRating",
-                    (community?.adjustedRating ?: BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP),
-                )
-                .set("communityScore", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP))
-                .set("updatedAt", now),
-        )
     }
 
     // ──────────────────────────── Aggregation helpers ────────────────────────────
@@ -839,6 +862,146 @@ class AppRoundScoreService(
         return data.avgRating
             .multiply(confidenceFactor, COMMUNITY_MC)
             .multiply(engagementFactor, COMMUNITY_MC)
+    }
+
+    // ──────────────────────────── Profile Score ────────────────────────────
+
+    /** Profile Score components for a single app, persisted into the round-score document. */
+    private data class ProfileScoreData(
+        val optionalFieldsCount: Int,
+        val staticScore: BigDecimal,
+        val productRecency: BigDecimal,
+        val socialRecency: BigDecimal,
+        val recencyFactor: BigDecimal,
+        val profileScore: BigDecimal,
+    )
+
+    /**
+     * The subset of an `AppMetadata` snapshot that feeds the Profile Score — extracted from the
+     * current document and each inline `_previousVersions` entry.
+     */
+    private data class AppMetadataSnapshot(
+        val blockTimestamp: Long, // Unix seconds (when the snapshot was published on-chain)
+        val versionHistoryUpdated: Int, // 1 iff version_history changed in this snapshot
+        val tweetsUpdated: Int, // 1 iff tweets changed in this snapshot
+        val optionalFieldsCount: Int, // 0-7 filled optional fields
+    )
+
+    /**
+     * Computes the Profile Score for every app in [onChainAppIds] that has an `xapp_metadata`
+     * document (VBD Reputation Layer Proposal, Profile Score).
+     *
+     * `ProfileScore = StaticScore × (0.8 + 0.2 × RecencyFactor)`, where:
+     * - `StaticScore = optionalFieldsCount / 7 × 100` (completeness of the 7 optional metadata
+     *   fields, from the latest snapshot).
+     * - `RecencyFactor = (ProductRecency + SocialRecency) / 2`.
+     * - `ProductRecency` / `SocialRecency ∈ {0, 0.5, 1.0}` from the time since the most recent
+     *   snapshot whose `versionHistoryUpdated` / `tweetsUpdated` flag is `1` (≤14d → 1.0, 14–30d →
+     *   0.5, >30d → 0).
+     *
+     * The update flags are precomputed at write time (see `AppMetadataService`). To find when each
+     * flag last fired we scan the current snapshot plus the inline `_previousVersions` history.
+     * That array is normally stripped from reads by `FilteringMongoTemplate`, so the raw `Document`
+     * form is read directly (the version-exclusion projection only applies to `VersionedDocument`
+     * entity types, not to `Document`). Apps without a metadata document — or whose flags never
+     * fired — get the corresponding recency `0` (but keep their `StaticScore`). Round-independent
+     * snapshot; returned keyed by lower-cased `appId`. "now" is wall-clock time.
+     */
+    private fun computeProfileScores(onChainAppIds: List<String>): Map<String, ProfileScoreData> {
+        if (onChainAppIds.isEmpty()) return emptyMap()
+        val collection = IndexerNames.XAPP_METADATA.COLLECTION
+        if (!mongoTemplate.collectionExists(collection)) return emptyMap()
+
+        val docs =
+            mongoTemplate.find(
+                Query(Criteria.where("_id").`in`(onChainAppIds)),
+                Document::class.java,
+                collection,
+            )
+
+        val now = System.currentTimeMillis()
+        val result = mutableMapOf<String, ProfileScoreData>()
+        for (doc in docs) {
+            val appId = (doc["_id"] as? String)?.lowercase() ?: continue
+            val snapshots = extractMetadataSnapshots(doc)
+            if (snapshots.isEmpty()) continue
+
+            val current = snapshots.first()
+            val staticScore = computeStaticScore(current.optionalFieldsCount)
+            val productRecency = computeRecency(snapshots, now) { it.versionHistoryUpdated == 1 }
+            val socialRecency = computeRecency(snapshots, now) { it.tweetsUpdated == 1 }
+            val recencyFactor = productRecency.add(socialRecency).divide(TWO, COMMUNITY_MC)
+            val profileScore =
+                staticScore.multiply(
+                    PROFILE_BASE_WEIGHT.add(
+                        PROFILE_RECENCY_WEIGHT.multiply(recencyFactor, COMMUNITY_MC),
+                        COMMUNITY_MC,
+                    ),
+                    COMMUNITY_MC,
+                )
+            result[appId] =
+                ProfileScoreData(
+                    optionalFieldsCount = current.optionalFieldsCount,
+                    staticScore = staticScore,
+                    productRecency = productRecency,
+                    socialRecency = socialRecency,
+                    recencyFactor = recencyFactor,
+                    profileScore = profileScore,
+                )
+        }
+        return result
+    }
+
+    /**
+     * Extracts the current snapshot plus each inline `_previousVersions` entry, newest first (the
+     * array is prepended on every update). Entries lacking a `blockTimestamp` are skipped.
+     */
+    private fun extractMetadataSnapshots(doc: Document): List<AppMetadataSnapshot> {
+        val snapshots = mutableListOf<AppMetadataSnapshot>()
+        snapshotOf(doc)?.let(snapshots::add)
+        val previous = doc.get(PREVIOUS_VERSIONS_FIELD) as? List<*>
+        previous?.forEach { entry -> if (entry is Document) snapshotOf(entry)?.let(snapshots::add) }
+        return snapshots
+    }
+
+    private fun snapshotOf(doc: Document): AppMetadataSnapshot? {
+        val blockTimestamp = (doc.get("blockTimestamp") as? Number)?.toLong() ?: return null
+        return AppMetadataSnapshot(
+            blockTimestamp = blockTimestamp,
+            versionHistoryUpdated = (doc.get("versionHistoryUpdated") as? Number)?.toInt() ?: 0,
+            tweetsUpdated = (doc.get("tweetsUpdated") as? Number)?.toInt() ?: 0,
+            optionalFieldsCount = (doc.get("optionalFieldsCount") as? Number)?.toInt() ?: 0,
+        )
+    }
+
+    /** StaticScore = optionalFieldsCount / M_total × 100, where M_total = 7 optional fields. */
+    private fun computeStaticScore(optionalFieldsCount: Int): BigDecimal =
+        if (optionalFieldsCount <= 0) {
+            BigDecimal.ZERO
+        } else {
+            BigDecimal(optionalFieldsCount)
+                .multiply(HUNDRED)
+                .divide(OPTIONAL_FIELDS_TOTAL, COMMUNITY_MC)
+        }
+
+    /**
+     * Recency component ∈ {0, 0.5, 1.0} for the content type selected by [updatedIn]. Finds the
+     * most recent snapshot (newest first) whose flag fired and maps the elapsed time to the
+     * proposal thresholds (≤14d → 1.0, 14–30d → 0.5, >30d → 0). Never updated → 0.
+     */
+    private fun computeRecency(
+        snapshots: List<AppMetadataSnapshot>,
+        now: Long,
+        updatedIn: (AppMetadataSnapshot) -> Boolean,
+    ): BigDecimal {
+        val lastUpdateSec =
+            snapshots.firstOrNull(updatedIn)?.blockTimestamp ?: return BigDecimal.ZERO
+        val elapsedMs = now - lastUpdateSec * MILLIS_PER_SECOND
+        return when {
+            elapsedMs <= RECENCY_DAYS_FULL * MILLIS_PER_DAY -> BigDecimal.ONE
+            elapsedMs <= RECENCY_DAYS_PARTIAL * MILLIS_PER_DAY -> HALF
+            else -> BigDecimal.ZERO
+        }
     }
 }
 

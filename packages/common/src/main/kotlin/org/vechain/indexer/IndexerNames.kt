@@ -296,6 +296,11 @@ object IndexerNames {
         const val COLLECTION = "xapp_review_votes"
     }
 
+    object XAPP_METADATA {
+        const val NAME = "XAppMetadataIndexer"
+        const val COLLECTION = "xapp_metadata"
+    }
+
     object ONCHAIN_SCORE {
         const val NAME = "OnchainScoringAggregator"
         const val COLLECTION = "b3tr_onchain_scores"
