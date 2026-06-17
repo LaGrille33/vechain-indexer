@@ -49,6 +49,10 @@ data class ReviewWithVotes(
     @Schema(description = "Block timestamp (Unix seconds)", example = "1779424224")
     val blockTimestamp: Long,
     @Schema(description = "Whether the review is hidden", example = "false") val isHidden: Boolean,
+    @Schema(description = "Creation (publish) timestamp (Unix seconds)", example = "1779424224")
+    val createdAt: Long,
+    @Schema(description = "Last edit timestamp (Unix seconds)", example = "1779424224")
+    val updatedAt: Long,
     @Schema(description = "Upvote statistics") val upvotes: VoteTypeStats,
     @Schema(description = "Downvote statistics") val downvotes: VoteTypeStats,
     @Schema(description = "Report statistics") val reports: VoteTypeStats,

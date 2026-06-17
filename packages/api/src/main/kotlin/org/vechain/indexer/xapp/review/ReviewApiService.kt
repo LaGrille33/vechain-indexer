@@ -288,6 +288,8 @@ open class ReviewApiService(
             content = content,
             blockTimestamp = blockTimestamp,
             isHidden = isHidden,
+            createdAt = createdAt ?: blockTimestamp,
+            updatedAt = updatedAt ?: createdAt ?: blockTimestamp,
             upvotes = stats.upvotes,
             downvotes = stats.downvotes,
             reports = stats.reports,

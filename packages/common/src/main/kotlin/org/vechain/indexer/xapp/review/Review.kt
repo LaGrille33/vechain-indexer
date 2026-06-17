@@ -49,6 +49,10 @@ constructor(
     @Schema(description = "Report count", example = "0") val reports: Long,
     @Schema(description = "Whether hidden (auto-hidden when reports >= 20)", example = "false")
     val isHidden: Boolean,
+    @Schema(description = "Creation (publish) timestamp, Unix seconds; null on legacy docs")
+    val createdAt: Long? = null,
+    @Schema(description = "Last edit timestamp, Unix seconds; null on legacy docs")
+    val updatedAt: Long? = null,
 ) : VersionedDocument {
     constructor(
         version: Int,
@@ -64,6 +68,8 @@ constructor(
         downvotes: Long = 0,
         reports: Long = 0,
         isHidden: Boolean = false,
+        createdAt: Long? = null,
+        updatedAt: Long? = null,
     ) : this(
         id = reviewId.toString(),
         version = version,
@@ -79,6 +85,8 @@ constructor(
         downvotes = downvotes,
         reports = reports,
         isHidden = isHidden,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 
     override fun getDocumentId(): String = id

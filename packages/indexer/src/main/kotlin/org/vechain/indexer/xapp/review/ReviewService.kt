@@ -95,6 +95,8 @@ open class ReviewService(
                             author = author,
                             title = "",
                             content = "",
+                            createdAt = event.blockTimestamp,
+                            updatedAt = event.blockTimestamp,
                         )
                     accumulator.put(recordId, null, review)
                 }
@@ -107,7 +109,8 @@ open class ReviewService(
                     val current = existing ?: continue
 
                     // Title/content are refreshed from the contract in enrichWithContractData; here
-                    // we only bump the version and block metadata so the update is persisted.
+                    // we bump version/block metadata and record the edit timestamp. createdAt is
+                    // left untouched (set once at creation).
                     accumulator.put(
                         recordId,
                         current,
@@ -116,6 +119,7 @@ open class ReviewService(
                             blockId = event.blockId,
                             blockNumber = event.blockNumber,
                             blockTimestamp = event.blockTimestamp,
+                            updatedAt = event.blockTimestamp,
                         ),
                     )
                 }
