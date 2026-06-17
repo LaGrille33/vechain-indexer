@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Profile
+import org.springframework.data.domain.Sort
 import org.springframework.data.mongodb.core.BulkOperations
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
@@ -16,6 +17,9 @@ import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.event.CycleInfoAggregationCompletedEvent
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
+import org.vechain.indexer.event.AbiLoader
+import org.vechain.indexer.event.model.abi.AbiElement
+import org.vechain.indexer.event.utils.FunctionReturnDecoder
 import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.thor.model.BlockRevision
 import org.vechain.indexer.thor.model.EventCriteria
@@ -31,8 +35,11 @@ class CycleInfoAggregationService(
     private val thorClient: ThorClient,
     private val cycleInfoRepository: CycleInfoRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
+    private val b3trRoundService: B3trRoundService,
     @param:Value("\${business-event.substitutions.EMISSIONS}")
     private val emissionsContractAddress: String,
+    @param:Value("\${business-event.substitutions.X_ALLOC_POOL_CONTRACT}")
+    private val xAllocationPoolAddress: String,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -54,8 +61,14 @@ class CycleInfoAggregationService(
         "0x${ContractUtils.getEventSignature(EMISSION_DISTRIBUTED_V2_SIG)}"
     }
 
+    private val allFundsClaimedAbi: AbiElement by lazy {
+        AbiLoader.loadFunctions("abis/b3tr", listOf("allFundsClaimed")).firstOrNull {
+            it.name == "allFundsClaimed"
+        } ?: throw IllegalArgumentException("Function 'allFundsClaimed' not found in ABI")
+    }
+
     @Scheduled(
-        fixedDelayString = "\${indexer.cycle-info.interval-ms:3600000}",
+        fixedDelayString = "\${indexer.cycle-info.interval-ms:60000}",
         initialDelayString = "\${indexer.cycle-info.initial-delay-ms:30000}",
     )
     fun aggregateCycleInfo() {
@@ -65,9 +78,11 @@ class CycleInfoAggregationService(
         } catch (e: Exception) {
             logger.error("Cycle info aggregation failed", e)
         } finally {
-            applicationEventPublisher.publishEvent(
-                CycleInfoAggregationCompletedEvent(syncedUpToRound = syncedRound)
-            )
+            if (syncedRound > 0) {
+                applicationEventPublisher.publishEvent(
+                    CycleInfoAggregationCompletedEvent(syncedUpToRound = syncedRound)
+                )
+            }
         }
     }
 
@@ -75,6 +90,24 @@ class CycleInfoAggregationService(
         val started = System.currentTimeMillis()
         logger.info("Starting cycle info aggregation...")
 
+        // Guard: only proceed once the "start new round & claim allocations" operation that
+        // emits the next cycle has fully settled on-chain. The pending emission is cycle M+1,
+        // which also claims round M, where M is the latest round already recorded in
+        // b3tr_cycle_info. Wait until a new round has started (current round > M) and all
+        // allocations for round M have been claimed before recording any further cycles.
+        val latestRecordedRound = getLatestRecordedRoundId()
+        if (
+            latestRecordedRound != null &&
+                latestRecordedRound > 0 &&
+                !isRoundSettled(latestRecordedRound)
+        ) {
+            logger.info(
+                "Latest recorded round {} not settled on-chain yet " +
+                    "(new round started & all allocations claimed); skipping cycle info aggregation",
+                latestRecordedRound,
+            )
+            return 0
+        }
         val collection = IndexerNames.CYCLE_INFO.COLLECTION
 
         // 1. Read watermark — last processed cycle
@@ -153,7 +186,47 @@ class CycleInfoAggregationService(
             maxRoundId,
             elapsed,
         )
+        if (latestRecordedRound == null) return 0
         return maxRoundId
+    }
+
+    /**
+     * Returns the highest roundId currently stored in b3tr_cycle_info, or null if the collection is
+     * empty.
+     */
+    private fun getLatestRecordedRoundId(): Int? {
+        val doc =
+            mongoTemplate.findOne(
+                Query().with(Sort.by(Sort.Direction.DESC, "roundId")).limit(1),
+                Document::class.java,
+                IndexerNames.CYCLE_INFO.COLLECTION,
+            )
+        return doc?.getInteger("roundId")
+    }
+
+    /**
+     * Checks on-chain whether the "start new round & claim allocations" operation that follows
+     * [roundId] has fully completed: a new round has started (current round > [roundId]) and all
+     * allocations for [roundId] have been claimed via XAllocationPool.allFundsClaimed.
+     */
+    private suspend fun isRoundSettled(roundId: Int): Boolean {
+        val revision = BlockRevision.Keyword.BEST
+        val currentRound = b3trRoundService.getCurrentRound(revision) ?: return false
+        if (currentRound <= roundId) return false
+        return isAllFundsClaimed(roundId, revision)
+    }
+
+    private suspend fun isAllFundsClaimed(roundId: Int, revision: BlockRevision): Boolean {
+        val clause =
+            ContractUtils.createClause(
+                xAllocationPoolAddress,
+                allFundsClaimedAbi,
+                roundId.toBigInteger(),
+            )
+        val response = thorClient.inspectClauses(listOf(clause), revision).first()
+        if (response.reverted) return false
+        val decoded = FunctionReturnDecoder.decode(response.data, allFundsClaimedAbi.outputs)
+        return decoded[""] as? Boolean ?: false
     }
 
     private suspend fun fetchAllEventLogs(
