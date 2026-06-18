@@ -136,7 +136,7 @@ class AppRoundScoreService(
 
         // Profile Score constants (VBD Reputation Layer Proposal, Profile Score)
         private val OPTIONAL_FIELDS_TOTAL =
-            BigDecimal(7) // total optional metadata fields (M_total)
+            BigDecimal(8) // total optional metadata fields (M_total)
         private val PROFILE_BASE_WEIGHT = BigDecimal("0.8") // completeness absolute weight
         private val PROFILE_RECENCY_WEIGHT = BigDecimal("0.2") // recency modulation weight
         private const val MILLIS_PER_SECOND = 1000L
