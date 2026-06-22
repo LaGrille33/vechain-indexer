@@ -30,6 +30,11 @@ class NavigatorVoteRoundReportAggregationService(
         private const val HISTORY_EVENT_NAME = "B3TR_XALLOCATION_VOTE"
     }
 
+    private data class RoundAggregationResult(
+        val report: NavigatorVoteRoundReport,
+        val dappRanking: NavigatorDappVoteRoundRanking,
+    )
+
     @Scheduled(
         fixedDelayString = "\${indexer.navigator-vote-report.interval-ms:60000}",
         initialDelayString = "\${indexer.navigator-vote-report.initial-delay-ms:30000}",
@@ -74,14 +79,19 @@ class NavigatorVoteRoundReportAggregationService(
 
         allCycles.forEach { cycle ->
             val roundId = cycle.roundId
-            val report = buildRoundReport(roundId, cycle.blockNumber, cycle.blockTimestamp)
-            mongoTemplate.save(report, IndexerNames.NAVIGATOR_VOTE_ROUND_REPORT.COLLECTION)
+            val result = buildRoundAggregation(roundId, cycle.blockNumber, cycle.blockTimestamp)
+            mongoTemplate.save(result.report, IndexerNames.NAVIGATOR_VOTE_ROUND_REPORT.COLLECTION)
+            mongoTemplate.save(
+                result.dappRanking,
+                IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING.COLLECTION,
+            )
             logger.info(
-                "Navigator vote report aggregated for round {}: navigators={}, delegatedVotes={}, totalVotes={}",
+                "Navigator vote report aggregated for round {}: navigators={}, delegatedVotes={}, totalVotes={}, dapps={}",
                 roundId,
-                report.navigatorCount,
-                report.delegatedVotes,
-                report.totalVotes,
+                result.report.navigatorCount,
+                result.report.delegatedVotes,
+                result.report.totalVotes,
+                result.dappRanking.dappCount,
             )
         }
 
@@ -93,11 +103,11 @@ class NavigatorVoteRoundReportAggregationService(
         )
     }
 
-    private fun buildRoundReport(
+    private fun buildRoundAggregation(
         roundId: Int,
         roundBlockNumber: Long,
         roundBlockTimestamp: Long,
-    ): NavigatorVoteRoundReport {
+    ): RoundAggregationResult {
         val reportId = NavigatorVoteRoundReport.idForRound(roundId)
         val activeCitizens = navigatorCitizenRepository.findAll().filter { it.active }
         val citizenToNavigator =
@@ -177,23 +187,73 @@ class NavigatorVoteRoundReportAggregationService(
                 IndexerNames.NAVIGATOR.COLLECTION,
             )
 
-        return NavigatorVoteRoundReport(
-            id = reportId,
+        val report =
+            NavigatorVoteRoundReport(
+                id = reportId,
+                blockId = "",
+                blockNumber = roundBlockNumber,
+                blockTimestamp = roundBlockTimestamp,
+                roundId = roundId,
+                reportStatus = "COMPLETED",
+                reportGeneratedAt = System.currentTimeMillis(),
+                totalVotes = votes.size.toLong(),
+                delegatedVotes = delegatedVotes,
+                manualVotes = manualVotes,
+                autoVotes = 0L,
+                navigatorCount = navigatorCount,
+                roundDeadline = null,
+                roundSnapshot = null,
+                totalDelegatedWeight = BigDecimal(totalWeight),
+                navigatorSummaries = navigatorSummaries,
+            )
+
+        val dappRanking =
+            buildDappRanking(roundId, roundBlockNumber, roundBlockTimestamp, appWeightByNavigator)
+        return RoundAggregationResult(report = report, dappRanking = dappRanking)
+    }
+
+    private fun buildDappRanking(
+        roundId: Int,
+        roundBlockNumber: Long,
+        roundBlockTimestamp: Long,
+        appWeightByNavigator: Map<String, Map<String, BigInteger>>,
+    ): NavigatorDappVoteRoundRanking {
+        val totalWeightByApp = mutableMapOf<String, BigInteger>()
+        val navigatorSetByApp = mutableMapOf<String, MutableSet<String>>()
+
+        appWeightByNavigator.forEach { (navigator, appWeights) ->
+            appWeights.forEach { (appId, weight) ->
+                totalWeightByApp[appId] = (totalWeightByApp[appId] ?: BigInteger.ZERO) + weight
+                navigatorSetByApp.computeIfAbsent(appId) { mutableSetOf() }.add(navigator)
+            }
+        }
+
+        val rankedApps =
+            totalWeightByApp.entries
+                .sortedWith(
+                    compareByDescending<Map.Entry<String, BigInteger>> { it.value }
+                        .thenBy { it.key }
+                )
+                .mapIndexed { idx, entry ->
+                    NavigatorDappVoteRankingEntry(
+                        rank = idx + 1,
+                        appId = entry.key,
+                        weight = entry.value,
+                        contributingNavigators = navigatorSetByApp[entry.key]?.size?.toLong() ?: 0L,
+                    )
+                }
+
+        val totalWeight = totalWeightByApp.values.fold(BigInteger.ZERO, BigInteger::add)
+        return NavigatorDappVoteRoundRanking(
+            id = NavigatorDappVoteRoundRanking.idForRound(roundId),
             blockId = "",
             blockNumber = roundBlockNumber,
             blockTimestamp = roundBlockTimestamp,
             roundId = roundId,
-            reportStatus = "COMPLETED",
             reportGeneratedAt = System.currentTimeMillis(),
-            totalVotes = votes.size.toLong(),
-            delegatedVotes = delegatedVotes,
-            manualVotes = manualVotes,
-            autoVotes = 0L,
-            navigatorCount = navigatorCount,
-            roundDeadline = null,
-            roundSnapshot = null,
-            totalDelegatedWeight = BigDecimal(totalWeight),
-            navigatorSummaries = navigatorSummaries,
+            dappCount = rankedApps.size.toLong(),
+            totalWeight = BigDecimal(totalWeight),
+            dappRankings = rankedApps,
         )
     }
 }

@@ -145,6 +145,7 @@ class IpfsMetadataClient(
         var count = 0
         if (isFilled(root.path("social_urls"))) count++
         if (isFilled(root.path("tweets"))) count++
+        if (isFilled(root.path("version_history"))) count++
         if (isFilled(root.path("whitepaper"))) count++
         if (isFilled(root.path("tutorial_video")) || isFilled(root.path("tutorial_images"))) count++
         val moreDetails = root.path("more_details")

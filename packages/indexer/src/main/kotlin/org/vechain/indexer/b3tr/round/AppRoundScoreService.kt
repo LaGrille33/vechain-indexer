@@ -5,6 +5,7 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
 import java.math.RoundingMode
+import kotlin.math.ceil
 import kotlin.math.exp
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
@@ -29,6 +30,7 @@ import org.vechain.indexer.event.model.abi.AbiElement
 import org.vechain.indexer.event.utils.FunctionReturnDecoder
 import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.utils.ContractUtils
+import org.vechain.indexer.xapp.badge.BadgeType
 
 /**
  * Computes the **Activity Score**, **Distribution Efficiency Score**, **Community Score**,
@@ -134,7 +136,7 @@ class AppRoundScoreService(
 
         // Profile Score constants (VBD Reputation Layer Proposal, Profile Score)
         private val OPTIONAL_FIELDS_TOTAL =
-            BigDecimal(7) // total optional metadata fields (M_total)
+            BigDecimal(8) // total optional metadata fields (M_total)
         private val PROFILE_BASE_WEIGHT = BigDecimal("0.8") // completeness absolute weight
         private val PROFILE_RECENCY_WEIGHT = BigDecimal("0.2") // recency modulation weight
         private const val MILLIS_PER_SECOND = 1000L
@@ -148,6 +150,9 @@ class AppRoundScoreService(
         private val WEIGHT_DISTRIBUTION = BigDecimal("0.3")
         private val WEIGHT_COMMUNITY = BigDecimal("0.3")
         private val WEIGHT_PROFILE = BigDecimal("0.1")
+
+        // Navigators Pick badge: number of top dApps (by navigator voting weight) that earn it.
+        private const val NAVIGATORS_PICK_TOP_N = 3
 
         // ln1pBig helpers
         private val TWO = BigDecimal(2)
@@ -297,6 +302,12 @@ class AppRoundScoreService(
                 roundId = targetRound,
                 firstSeenAvailable = firstSeenAvailable,
             )
+
+        // Award xApp badges for this round (TOP_ECOSYSTEM_DAPP ranks by totalScore,
+        // TOP_DISTRIBUTION_PERFORMER by distributionScore, NAVIGATORS_PICK by navigator voting
+        // rank). Each badge type guards on its own data source, so this runs even when this round
+        // produced no scored apps (e.g. the navigator ranking can exist independently).
+        awardBadges(targetRound)
 
         val elapsed = System.currentTimeMillis() - started
         logger.info(
@@ -535,6 +546,254 @@ class AppRoundScoreService(
         }
         logger.info("Round {} scored: {} apps", roundId, count)
         return count
+    }
+
+    // ──────────────────────────── Badge awarding ────────────────────────────
+
+    /** An app's persisted round scores used as ranking inputs for badge awarding. */
+    private data class AppRoundScoreValue(
+        val appId: String,
+        val totalScore: BigDecimal,
+        val distributionScore: BigDecimal,
+    )
+
+    /**
+     * Awards xApp badges for [roundId] based on the scores this service just persisted in
+     * [b3tr_app_round_scores][IndexerNames.APP_ROUND_SCORE]:
+     * - [BadgeType.TOP_ECOSYSTEM_DAPP] — top 10% by `totalScore`.
+     * - [BadgeType.TOP_DISTRIBUTION_PERFORMER] — top 10% by `distributionScore`.
+     *
+     * Upserts one [org.vechain.indexer.xapp.badge.BadgeAward] per winner into
+     * [xapp_badge_awards][IndexerNames.XAPP_BADGE_AWARD], keyed by `appId_badgeType_round` so
+     * re-running is idempotent. This mirrors the badge logic that previously lived in
+     * `CycleScoringService.awardBadges`, but ranks against the authoritative per-round scores this
+     * service writes instead of `CycleScoringService`'s in-memory totals.
+     */
+    private fun awardBadges(roundId: Int) {
+        val badgeCollection = IndexerNames.XAPP_BADGE_AWARD.COLLECTION
+        val now = System.currentTimeMillis()
+        val roundBlockTimestamp =
+            mongoTemplate
+                .findOne(
+                    Query(Criteria.where("roundId").`is`(roundId)),
+                    Document::class.java,
+                    IndexerNames.CYCLE_INFO.COLLECTION,
+                )
+                ?.let { (it.get("blockTimestamp") as? Number)?.toLong() }
+
+        // 1 & 2. Score-based badges rank against b3tr_app_round_scores; skip both when that round
+        // has no scored apps (the data source they depend on is empty).
+        val scores = fetchRoundScores(roundId)
+        if (scores.isNotEmpty()) {
+            // 1. APP评分徽章 (TOP_ECOSYSTEM_DAPP): top 10% by totalScore
+            awardTopPercentageBadge(
+                badgeCollection,
+                roundId,
+                scores,
+                BadgeType.TOP_ECOSYSTEM_DAPP,
+                valueSelector = { it.totalScore },
+                allowTieExpansion = true,
+                now = now,
+                roundBlockTimestamp = roundBlockTimestamp,
+            )
+
+            // 2. 高效分发徽章 (TOP_DISTRIBUTION_PERFORMER): top 10% by distributionScore
+            awardTopPercentageBadge(
+                badgeCollection,
+                roundId,
+                scores,
+                BadgeType.TOP_DISTRIBUTION_PERFORMER,
+                valueSelector = { it.distributionScore },
+                allowTieExpansion = false,
+                now = now,
+                roundBlockTimestamp = roundBlockTimestamp,
+            )
+        }
+
+        // 3. Navigator精选徽章 (NAVIGATORS_PICK): top N by navigator voting weight. Independent of
+        // b3tr_app_round_scores — a round can have a navigator ranking without scored apps.
+        awardNavigatorsPickBadges(badgeCollection, roundId, now, roundBlockTimestamp)
+    }
+
+    /**
+     * Reads the per-app scores persisted for [roundId] from
+     * [b3tr_app_round_scores][IndexerNames.APP_ROUND_SCORE]. `totalScore` and `distributionScore`
+     * are stored as 4-dp decimals; a missing value defaults to `0.0`. Returns an empty list if the
+     * collection does not exist or has no documents for the round.
+     */
+    private fun fetchRoundScores(roundId: Int): List<AppRoundScoreValue> {
+        val docs =
+            mongoTemplate.find(
+                Query(Criteria.where("roundId").`is`(roundId)),
+                Document::class.java,
+                IndexerNames.APP_ROUND_SCORE.COLLECTION,
+            )
+        return docs.mapNotNull { doc ->
+            val appId = doc.getString("appId") ?: return@mapNotNull null
+            AppRoundScoreValue(
+                appId = appId,
+                totalScore = toBigDecimal(doc.get("totalScore")),
+                distributionScore = toBigDecimal(doc.get("distributionScore")),
+            )
+        }
+    }
+
+    /**
+     * Awards a badge of [badgeType] to the top 10% of [apps] (rounded up, minimum 1) as ranked by
+     * [valueSelector]. Sorting is by value descending, then by `appId` for stable ordering. Equal
+     * values share a rank; when [allowTieExpansion] is `true`, apps tied with the last in-top-10%
+     * entry are included as well. Each winner is upserted into [badgeCollection] keyed by
+     * `appId_badgeType_round`.
+     */
+    private fun awardTopPercentageBadge(
+        badgeCollection: String,
+        roundId: Int,
+        apps: List<AppRoundScoreValue>,
+        badgeType: BadgeType,
+        valueSelector: (AppRoundScoreValue) -> BigDecimal,
+        allowTieExpansion: Boolean,
+        now: Long,
+        roundBlockTimestamp: Long?,
+    ) {
+        if (apps.isEmpty()) return
+
+        // Sort descending by value, then by appId for stable ordering
+        val ranked =
+            apps.sortedWith(
+                compareByDescending<AppRoundScoreValue> { valueSelector(it) }.thenBy { it.appId }
+            )
+
+        // Top 10%, rounded up (ceil). Minimum 1.
+        val topCount = maxOf(1, ceil(ranked.size * 0.1).toInt())
+
+        // Assign ranks with tie handling
+        val rankedApps = mutableListOf<Pair<AppRoundScoreValue, Int>>()
+        var currentRank = 1
+        for (i in ranked.indices) {
+            if (i > 0) {
+                val prevValue = valueSelector(ranked[i - 1])
+                val currValue = valueSelector(ranked[i])
+                if (currValue.compareTo(prevValue) != 0) {
+                    currentRank = i + 1
+                }
+            }
+            // Only include apps within the top 10%
+            if (allowTieExpansion) {
+                // Include if rank <= topCount, or if tied with the last included app
+                if (currentRank <= topCount) {
+                    rankedApps.add(ranked[i] to currentRank)
+                } else {
+                    // Check if tied with the last included app
+                    val lastIncludedValue = valueSelector(rankedApps.last().first)
+                    if (valueSelector(ranked[i]).compareTo(lastIncludedValue) == 0) {
+                        rankedApps.add(ranked[i] to currentRank)
+                    }
+                }
+            } else {
+                if (currentRank <= topCount) {
+                    rankedApps.add(ranked[i] to currentRank)
+                }
+            }
+        }
+
+        if (rankedApps.isEmpty()) return
+
+        // Bulk upsert badge awards
+        val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, badgeCollection)
+        for ((app, rank) in rankedApps) {
+            val id = "${app.appId}_${badgeType.value}_$roundId"
+            bulkOps.upsert(
+                Query(Criteria.where("_id").`is`(id)),
+                Update()
+                    .set("_id", id)
+                    .set("version", 1)
+                    .set("blockId", "")
+                    .set("blockNumber", 0L)
+                    .set("blockTimestamp", now)
+                    .set("appId", app.appId)
+                    .set("badgeType", badgeType.value)
+                    .set("round", roundId.toLong())
+                    .set("rank", rank)
+                    .set("isPublished", true)
+                    .set("roundBlockTimestamp", roundBlockTimestamp),
+            )
+        }
+        bulkOps.execute()
+
+        logger.info(
+            "Round {}: awarded {} {} badges (top {}% of {} apps)",
+            roundId,
+            rankedApps.size,
+            badgeType.name,
+            topCount,
+            apps.size,
+        )
+    }
+
+    /**
+     * Awards the [BadgeType.NAVIGATORS_PICK] badge to the top [NAVIGATORS_PICK_TOP_N] dApps in
+     * [roundId] by navigator voting weight. The ranking lives in
+     * [b3tr_navigator_dapp_vote_round_rankings][IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING]:
+     * its `dappRankings` array is already ranked at write time (rank 1 = highest weight), so the
+     * entries with `rank ≤ [NAVIGATORS_PICK_TOP_N]` each get a
+     * [org.vechain.indexer.xapp.badge.BadgeAward], upserted into [badgeCollection] keyed by
+     * `appId_badgeType_round`. The `appId` is lower-cased to match the `_id` convention of the
+     * other badges (and `b3tr_app_round_scores.appId`). No-op if no ranking document exists for the
+     * round.
+     */
+    private fun awardNavigatorsPickBadges(
+        badgeCollection: String,
+        roundId: Int,
+        now: Long,
+        roundBlockTimestamp: Long?,
+    ) {
+        val doc =
+            mongoTemplate.findOne(
+                Query(Criteria.where("roundId").`is`(roundId)),
+                Document::class.java,
+                IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING.COLLECTION,
+            ) ?: return
+
+        val rankings = doc.get("dappRankings") as? List<*> ?: return
+        // dappRankings is written as NavigatorDappVoteRankingEntry; rank is already 1-based and
+        // sorted by weight descending. Keep the (rank, appId) pairs in the top N.
+        val winners =
+            rankings.mapNotNull { entry ->
+                val e = entry as? Document ?: return@mapNotNull null
+                val rank = (e.get("rank") as? Number)?.toInt() ?: return@mapNotNull null
+                val appId = e.getString("appId") ?: return@mapNotNull null
+                if (rank in 1..NAVIGATORS_PICK_TOP_N) rank to appId.lowercase() else null
+            }
+        if (winners.isEmpty()) return
+
+        val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, badgeCollection)
+        for ((rank, appId) in winners) {
+            val id = "${appId}_${BadgeType.NAVIGATORS_PICK.value}_$roundId"
+            bulkOps.upsert(
+                Query(Criteria.where("_id").`is`(id)),
+                Update()
+                    .set("_id", id)
+                    .set("version", 1)
+                    .set("blockId", "")
+                    .set("blockNumber", 0L)
+                    .set("blockTimestamp", now)
+                    .set("appId", appId)
+                    .set("badgeType", BadgeType.NAVIGATORS_PICK.value)
+                    .set("round", roundId.toLong())
+                    .set("rank", rank)
+                    .set("isPublished", true)
+                    .set("roundBlockTimestamp", roundBlockTimestamp),
+            )
+        }
+        bulkOps.execute()
+
+        logger.info(
+            "Round {}: awarded {} {} badges (top {} of navigator rankings)",
+            roundId,
+            winners.size,
+            BadgeType.NAVIGATORS_PICK.name,
+            NAVIGATORS_PICK_TOP_N,
+        )
     }
 
     // ──────────────────────────── On-chain app lookup ────────────────────────────
