@@ -17,7 +17,9 @@ import org.vechain.indexer.b3tr.action.repository.AppRoundActionSummaryRepositor
 import org.vechain.indexer.b3tr.action.repository.UserAllTimeActionSummaryRepository
 import org.vechain.indexer.b3tr.action.repository.UserDailyActionSummaryRepository
 import org.vechain.indexer.b3tr.action.repository.UserRoundActionSummaryRepository
+import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.b3tr.shared.EntityType
+import org.vechain.indexer.b3tr.userfirstseen.UserFirstSeenRepository
 import org.vechain.indexer.history.HistoryRepository
 import org.vechain.indexer.thor.Address
 
@@ -30,6 +32,8 @@ internal class ActionServiceTest {
     @MockK lateinit var appAllTimeRepo: AppAllTimeActionSummaryRepository
     @MockK lateinit var appDailyRepo: AppDailyActionSummaryRepository
     @MockK lateinit var appRoundRepo: AppRoundActionSummaryRepository
+    @MockK(relaxed = true) lateinit var cycleInfoRepo: CycleInfoRepository
+    @MockK(relaxed = true) lateinit var userFirstSeenRepo: UserFirstSeenRepository
 
     private lateinit var service: ActionService
 
@@ -45,6 +49,8 @@ internal class ActionServiceTest {
                 appAllTimeRepo,
                 appDailyRepo,
                 appRoundRepo,
+                cycleInfoRepo,
+                userFirstSeenRepo,
                 kotlinx.coroutines.Dispatchers.IO.limitedParallelism(4),
             )
     }
