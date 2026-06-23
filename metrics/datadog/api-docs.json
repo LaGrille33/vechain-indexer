@@ -182,6 +182,27 @@
         ],
         "type": "object"
       },
+      "AppEarnedBadgesResponse": {
+        "description": "Earned badges for an app, grouped by badge type",
+        "properties": {
+          "appId": {
+            "description": "The app ID",
+            "type": "string"
+          },
+          "badges": {
+            "description": "List of earned badge summaries",
+            "items": {
+              "$ref": "#/components/schemas/BadgeSummary"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "appId",
+          "badges"
+        ],
+        "type": "object"
+      },
       "AppLeaderboardItem": {
         "properties": {
           "actionsRewarded": {
@@ -254,6 +275,234 @@
           "appId",
           "totalRewardAmount",
           "totalUniqueUserInteractions"
+        ],
+        "type": "object"
+      },
+      "AppPreviousRoundBadgeResponse": {
+        "description": "Badge awards for an app in the previous round",
+        "properties": {
+          "appId": {
+            "description": "The app ID",
+            "type": "string"
+          },
+          "badges": {
+            "description": "List of badges earned in this round",
+            "items": {
+              "$ref": "#/components/schemas/BadgeAwardItem"
+            },
+            "type": "array"
+          },
+          "round": {
+            "description": "Previous round number",
+            "format": "int32",
+            "type": "integer"
+          },
+          "roundTimestamp": {
+            "description": "Previous round timestamp (Unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "badges",
+          "round"
+        ],
+        "type": "object"
+      },
+      "AppPreviousScoreResponse": {
+        "description": "App score for the previous round",
+        "properties": {
+          "activity": {
+            "description": "Activity dimension score (0-20)",
+            "example": 12,
+            "format": "int32",
+            "type": "integer"
+          },
+          "appId": {
+            "description": "App identifier",
+            "type": "string"
+          },
+          "community": {
+            "description": "Community dimension score (0-20)",
+            "example": 18,
+            "format": "int32",
+            "type": "integer"
+          },
+          "distribution": {
+            "description": "Distribution dimension score (0-20)",
+            "example": 15,
+            "format": "int32",
+            "type": "integer"
+          },
+          "health": {
+            "description": "Health dimension score (0-20)",
+            "example": 14,
+            "format": "int32",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "Ranking",
+            "example": 3,
+            "format": "int32",
+            "type": "integer"
+          },
+          "round": {
+            "description": "Round number",
+            "example": 5,
+            "format": "int64",
+            "type": "integer"
+          },
+          "roundDate": {
+            "description": "Round date (Unix timestamp)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "score": {
+            "description": "App Score",
+            "example": 85,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "round"
+        ],
+        "type": "object"
+      },
+      "AppRatingDetail": {
+        "description": "App rating with domain resolution",
+        "properties": {
+          "appId": {
+            "description": "App ID (bytes32 hex)",
+            "example": "0x6d25...77b4",
+            "type": "string"
+          },
+          "blockId": {
+            "description": "Block hash",
+            "type": "string"
+          },
+          "blockNumber": {
+            "description": "Block number",
+            "example": 15000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "blockTimestamp": {
+            "description": "Block timestamp (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "MongoDB document ID (<appId>_<rater>)",
+            "type": "string"
+          },
+          "rater": {
+            "description": "Rater wallet address (checksummed)",
+            "type": "string"
+          },
+          "raterDomain": {
+            "description": "Rater vet domain name (null if not resolved)",
+            "example": "alice.vet",
+            "type": "string"
+          },
+          "rating": {
+            "description": "Rating (1-5)",
+            "example": 4,
+            "format": "int32",
+            "type": "integer"
+          },
+          "version": {
+            "description": "Document version",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "blockId",
+          "blockNumber",
+          "blockTimestamp",
+          "id",
+          "rater",
+          "rating",
+          "version"
+        ],
+        "type": "object"
+      },
+      "AppRatingSummary": {
+        "description": "Aggregated rating summary for an app",
+        "properties": {
+          "appId": {
+            "description": "App ID (bytes32 hex)",
+            "example": "0x6d25...77b4",
+            "type": "string"
+          },
+          "average": {
+            "description": "Average rating, rounded to one decimal place",
+            "example": 4.7,
+            "format": "double",
+            "type": "number"
+          },
+          "count": {
+            "description": "Number of users who rated this app",
+            "example": 128,
+            "format": "int64",
+            "type": "integer"
+          },
+          "hasRated": {
+            "description": "Whether the current user has rated this app",
+            "example": true,
+            "type": "boolean"
+          },
+          "userRating": {
+            "description": "Current user's rating (null if wallet not provided or not rated)",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "average",
+          "count",
+          "hasRated"
+        ],
+        "type": "object"
+      },
+      "AppRoundUserStatsResponse": {
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "datas": {
+            "items": {
+              "$ref": "#/components/schemas/RoundUserStats"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "appId",
+          "datas"
+        ],
+        "type": "object"
+      },
+      "AppUserCountResponse": {
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "totalUserCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "totalUserCount"
         ],
         "type": "object"
       },
@@ -344,6 +593,379 @@
           "address",
           "balance",
           "rank"
+        ],
+        "type": "object"
+      },
+      "BadgeAward": {
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "badgeType": {
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "type": "string"
+          },
+          "blockId": {
+            "type": "string"
+          },
+          "blockNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "blockTimestamp": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "documentId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "rank": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "round": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roundBlockTimestamp": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "badgeType",
+          "blockId",
+          "blockNumber",
+          "blockTimestamp",
+          "documentId",
+          "id",
+          "isPublished",
+          "rank",
+          "round",
+          "version"
+        ],
+        "type": "object"
+      },
+      "BadgeAwardItem": {
+        "description": "A single badge award item with rank",
+        "properties": {
+          "badgeName": {
+            "description": "Badge display name",
+            "example": "Top Ecosystem DApp",
+            "type": "string"
+          },
+          "badgeType": {
+            "description": "Badge type",
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "example": "topEcosystemDapp",
+            "type": "string"
+          },
+          "earned": {
+            "description": "Whether the app earned this badge: 1 = earned, 0 = not earned",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "Rank in this round",
+            "example": 3,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "badgeName",
+          "badgeType",
+          "earned"
+        ],
+        "type": "object"
+      },
+      "BadgeDetail": {
+        "description": "Detailed information for a specific badge type",
+        "properties": {
+          "badgeName": {
+            "description": "Display name of the badge",
+            "example": "Top Ecosystem DApp",
+            "type": "string"
+          },
+          "badgeType": {
+            "description": "Badge type",
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "example": "topEcosystemDapp",
+            "type": "string"
+          },
+          "description": {
+            "description": "Description of the badge",
+            "example": "Awarded to top ecosystem dApps",
+            "type": "string"
+          },
+          "isPublished": {
+            "description": "Whether the badge is published",
+            "example": true,
+            "type": "boolean"
+          },
+          "latestBadges": {
+            "description": "Latest Badges",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          },
+          "records": {
+            "description": "List of award records",
+            "items": {
+              "$ref": "#/components/schemas/BadgeRecord"
+            },
+            "type": "array"
+          },
+          "totalBadgesEarned": {
+            "description": "Total Badges Earned",
+            "example": 5,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "badgeName",
+          "badgeType",
+          "description",
+          "isPublished",
+          "records",
+          "totalBadgesEarned"
+        ],
+        "type": "object"
+      },
+      "BadgeRecord": {
+        "description": "A single badge award record",
+        "properties": {
+          "date": {
+            "description": "Timestamp of the round (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "Rank in this round",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "round": {
+            "description": "Round number",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "rank",
+          "round"
+        ],
+        "type": "object"
+      },
+      "BadgeRoundInfo": {
+        "description": "Badge ranking info for a single round",
+        "properties": {
+          "date": {
+            "description": "Date",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "Ranking",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "round": {
+            "description": "Round number",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "round"
+        ],
+        "type": "object"
+      },
+      "BadgeRoundRankResponse": {
+        "description": "Badge rank info for a specific round with summary stats",
+        "properties": {
+          "appId": {
+            "description": "The app ID",
+            "type": "string"
+          },
+          "badgeType": {
+            "description": "Badge type",
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "example": "topEcosystemDapp",
+            "type": "string"
+          },
+          "latestBadges": {
+            "description": "Latest Badges",
+            "example": 15,
+            "format": "int64",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "Rank in this round, null if not awarded",
+            "example": 3,
+            "format": "int32",
+            "type": "integer"
+          },
+          "round": {
+            "description": "The queried round number",
+            "example": 5,
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalBadgesEarned": {
+            "description": "Total Badges Earned",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "appId",
+          "badgeType",
+          "round",
+          "totalBadgesEarned"
+        ],
+        "type": "object"
+      },
+      "BadgeStatsResponse": {
+        "description": "Badge statistics response including total count, latest round, and per-round rankings",
+        "properties": {
+          "badgeType": {
+            "description": "Badge type",
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "example": "topEcosystemDapp",
+            "type": "string"
+          },
+          "latestBadges": {
+            "description": "Latest Badges",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          },
+          "rounds": {
+            "description": "Acquisition Records",
+            "items": {
+              "$ref": "#/components/schemas/BadgeRoundInfo"
+            },
+            "type": "array"
+          },
+          "totalBadgesEarned": {
+            "description": "Total Badges Earned",
+            "example": 5,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "badgeType",
+          "rounds",
+          "totalBadgesEarned"
+        ],
+        "type": "object"
+      },
+      "BadgeSummary": {
+        "description": "Summary of a badge type for an app",
+        "properties": {
+          "badgeName": {
+            "description": "Display name of the badge",
+            "example": "Top Ecosystem DApp",
+            "type": "string"
+          },
+          "badgeType": {
+            "description": "Badge type",
+            "enum": [
+              "topEcosystemDapp",
+              "topDistributionPerformer",
+              "navigatorsPick"
+            ],
+            "example": "topEcosystemDapp",
+            "type": "string"
+          },
+          "earned": {
+            "description": "Whether the app has earned this badge: 1 = earned, 0 = not earned",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "isPublished": {
+            "description": "Whether the badge is published",
+            "example": true,
+            "type": "boolean"
+          },
+          "latestBadges": {
+            "description": "Latest Badges",
+            "example": 12,
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalBadgesEarned": {
+            "description": "Total Badges Earned",
+            "example": 5,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "badgeName",
+          "badgeType",
+          "earned",
+          "isPublished",
+          "totalBadgesEarned"
+        ],
+        "type": "object"
+      },
+      "BadgeVisibilityRequest": {
+        "description": "Request body for updating badge visibility",
+        "properties": {
+          "isPublished": {
+            "description": "Whether the badge should be published",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isPublished"
         ],
         "type": "object"
       },
@@ -957,6 +1579,91 @@
           "tokenLevel",
           "totalRewardsClaimed",
           "validator"
+        ],
+        "type": "object"
+      },
+      "DistributionPerformanceItem": {
+        "description": "Distribution performance metrics for a single round.",
+        "properties": {
+          "b3trDistributed": {
+            "description": "B3TR actually distributed by the app in this round.",
+            "example": 25.0,
+            "type": "number"
+          },
+          "distributionPerformance": {
+            "description": "Percentage of total allocation actually distributed (0-100).",
+            "example": 0.04,
+            "type": "number"
+          },
+          "rewardsAllocationAmount": {
+            "description": "B3TR allocated to the app for rewarding users in this round.",
+            "example": 70331.81455991528,
+            "type": "number"
+          },
+          "roundId": {
+            "description": "The round/cycle ID.",
+            "example": 477,
+            "format": "int32",
+            "type": "integer"
+          },
+          "roundTime": {
+            "description": "Block timestamp of the round (Unix epoch seconds).",
+            "example": 1772615600,
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalAllocationAmount": {
+            "description": "Total B3TR allocated to the app this round (rewards + DBA).",
+            "example": 70331.81455991528,
+            "type": "number"
+          }
+        },
+        "required": [
+          "b3trDistributed",
+          "distributionPerformance",
+          "rewardsAllocationAmount",
+          "roundId",
+          "roundTime",
+          "totalAllocationAmount"
+        ],
+        "type": "object"
+      },
+      "EligibilityResult": {
+        "description": "Whether the wallet may rate/review the app",
+        "properties": {
+          "actionsRewarded": {
+            "description": "Number of rewarded actions for the wallet on the app (null if none)",
+            "format": "int64",
+            "nullable": true,
+            "type": "integer"
+          },
+          "appId": {
+            "description": "App ID (bytes32 hex, lowercased)",
+            "type": "string"
+          },
+          "eligible": {
+            "description": "True if the wallet has received a B3TR reward from the app",
+            "type": "boolean"
+          },
+          "reason": {
+            "description": "Reason when not eligible",
+            "nullable": true,
+            "type": "string"
+          },
+          "totalRewardAmount": {
+            "description": "Total B3TR rewarded to the wallet for the app (null if none)",
+            "nullable": true,
+            "type": "number"
+          },
+          "wallet": {
+            "description": "Wallet address (lowercased)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "appId",
+          "eligible",
+          "wallet"
         ],
         "type": "object"
       },
@@ -2058,6 +2765,24 @@
         ],
         "type": "object"
       },
+      "PaginatedCountResponseReviewWithVotes": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewWithVotes"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationCountDetail"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "PaginatedResponseAction": {
         "properties": {
           "data": {
@@ -2099,6 +2824,24 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/B3trRichlistItem"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationDetail"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "PaginatedResponseBadgeRecord": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BadgeRecord"
             },
             "type": "array"
           },
@@ -2382,6 +3125,24 @@
         ],
         "type": "object"
       },
+      "PaginatedResponseReviewVoteDetail": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewVoteDetail"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationDetail"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "PaginatedResponseSafeMembership": {
         "properties": {
           "data": {
@@ -2652,6 +3413,37 @@
         ],
         "type": "object"
       },
+      "PaginationCountDetail": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hasNext",
+          "page",
+          "size",
+          "total",
+          "totalPages"
+        ],
+        "type": "object"
+      },
       "PaginationDetail": {
         "properties": {
           "cursor": {
@@ -2837,6 +3629,241 @@
           "totalPower",
           "totalWeight",
           "voters"
+        ],
+        "type": "object"
+      },
+      "ReviewVoteDetail": {
+        "description": "Detailed vote record with domain resolution",
+        "properties": {
+          "domain": {
+            "description": "Vet domain name (null if not resolved)",
+            "example": "jun.vet",
+            "type": "string"
+          },
+          "timestamp": {
+            "description": "Vote timestamp (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "voteType": {
+            "description": "Vote type: 1=UPVOTE, 2=DOWNVOTE, 3=REPORT",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "voteTypeName": {
+            "description": "Vote type name",
+            "example": "UPVOTE",
+            "type": "string"
+          },
+          "voter": {
+            "description": "Voter wallet address (checksummed)",
+            "example": "0xf077b491b355e64048ce21e3a6fc4751eeea77fa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timestamp",
+          "voteType",
+          "voteTypeName",
+          "voter"
+        ],
+        "type": "object"
+      },
+      "ReviewVoteStats": {
+        "description": "Aggregated vote statistics for a review",
+        "properties": {
+          "downvotes": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          },
+          "reports": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          },
+          "total": {
+            "description": "Total number of votes",
+            "example": 50,
+            "format": "int64",
+            "type": "integer"
+          },
+          "upvotes": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          }
+        },
+        "required": [
+          "downvotes",
+          "reports",
+          "total",
+          "upvotes"
+        ],
+        "type": "object"
+      },
+      "ReviewWithVotes": {
+        "description": "Review with vote statistics and user context",
+        "properties": {
+          "appId": {
+            "description": "App ID (bytes32 hex)",
+            "example": "0x6d25...77b4",
+            "type": "string"
+          },
+          "author": {
+            "description": "Author wallet address (checksummed)",
+            "example": "0xf077b491b355e64048ce21e3a6fc4751eeea77fa",
+            "type": "string"
+          },
+          "authorDomain": {
+            "description": "Author vet domain name (null if not resolved)",
+            "example": "alice.vet",
+            "type": "string"
+          },
+          "blockTimestamp": {
+            "description": "Block timestamp (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "content": {
+            "description": "Review content",
+            "example": "Really good experience.",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Creation (publish) timestamp (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "downvotes": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          },
+          "isHidden": {
+            "description": "Whether the review is hidden",
+            "example": false,
+            "type": "boolean"
+          },
+          "myVoteType": {
+            "description": "Current user's vote type on this review (0=none, 1=upvote, 2=downvote, 3=report)",
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "reports": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          },
+          "reviewId": {
+            "description": "Review ID",
+            "example": 6,
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "Review title",
+            "example": "Great app",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Last edit timestamp (Unix seconds)",
+            "example": 1779424224,
+            "format": "int64",
+            "type": "integer"
+          },
+          "upvotes": {
+            "$ref": "#/components/schemas/VoteTypeStats"
+          }
+        },
+        "required": [
+          "appId",
+          "author",
+          "blockTimestamp",
+          "content",
+          "createdAt",
+          "downvotes",
+          "isHidden",
+          "myVoteType",
+          "reports",
+          "reviewId",
+          "title",
+          "updatedAt",
+          "upvotes"
+        ],
+        "type": "object"
+      },
+      "RewardDetailsResponse": {
+        "description": "Reward details summary for an app.",
+        "properties": {
+          "actionsRewarded": {
+            "description": "Total number of rewarded actions.",
+            "example": 1250,
+            "format": "int64",
+            "type": "integer"
+          },
+          "averageAllocationPerRound": {
+            "description": "Average B3TR allocated per round.",
+            "example": 5410.14,
+            "type": "number"
+          },
+          "averageDistributionPerRound": {
+            "description": "Average B3TR distributed per round.",
+            "example": 2446.19,
+            "type": "number"
+          },
+          "totalAllocationEarnings": {
+            "description": "Total B3TR allocated to the app across all rounds.",
+            "example": 70331.81,
+            "type": "number"
+          },
+          "totalDistributed": {
+            "description": "Total B3TR distributed by the app.",
+            "example": 31800.5,
+            "type": "number"
+          },
+          "totalDistributionPerformance": {
+            "description": "Percentage of total allocation actually distributed (0-100), 2 decimal places.",
+            "example": 45.23,
+            "type": "number"
+          },
+          "totalRounds": {
+            "description": "Number of rounds the app participated in.",
+            "example": 13,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "actionsRewarded",
+          "averageAllocationPerRound",
+          "averageDistributionPerRound",
+          "totalAllocationEarnings",
+          "totalDistributed",
+          "totalDistributionPerformance",
+          "totalRounds"
+        ],
+        "type": "object"
+      },
+      "RoundUserStats": {
+        "properties": {
+          "activeUsers": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "newUsers": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "round": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "roundDate": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activeUsers",
+          "newUsers",
+          "round",
+          "roundDate"
         ],
         "type": "object"
       },
@@ -4135,6 +5162,28 @@
         ],
         "type": "object"
       },
+      "VoteTypeStats": {
+        "description": "Statistics for a single vote type",
+        "properties": {
+          "count": {
+            "description": "Number of votes of this type",
+            "example": 35,
+            "format": "int64",
+            "type": "integer"
+          },
+          "percentage": {
+            "description": "Percentage of total votes",
+            "example": 70.0,
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "percentage"
+        ],
+        "type": "object"
+      },
       "XAllocEarningsResponse": {
         "properties": {
           "appId": {
@@ -4700,6 +5749,217 @@
           }
         },
         "summary": "Get B3TR action overview for a specific app, optionally for a specific round or date.",
+        "tags": [
+          "B3TR - Actions"
+        ]
+      }
+    },
+    "/api/v1/b3tr/actions/apps/{appId}/roundUserStats": {
+      "get": {
+        "description": "\n            Returns activeUsers and newUsers for each round within the specified range.\n            - 3M: last 13 rounds (including previous round)\n            - 6M: last 26 rounds (including previous round)\n            - 1Y: last 52 rounds (including previous round)\n            - ALL: all rounds up to and including the previous round\n        ",
+        "operationId": "getAppRoundUserStats",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Round range preset to use for the query.",
+            "example": "3M",
+            "in": "query",
+            "name": "range",
+            "required": true,
+            "schema": {
+              "enum": [
+                "3M",
+                "6M",
+                "1Y",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRoundUserStatsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get per-round active and new user statistics for a specific app",
+        "tags": [
+          "B3TR - Actions"
+        ]
+      }
+    },
+    "/api/v1/b3tr/actions/apps/{appId}/userCount": {
+      "get": {
+        "operationId": "getAppUserCount",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppUserCountResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get total user count for a specific app",
         "tags": [
           "B3TR - Actions"
         ]
@@ -8079,6 +9339,122 @@
         ]
       }
     },
+    "/api/v1/b3tr/xallocations/distribution-performance": {
+      "get": {
+        "description": "Returns distribution performance metrics for a specific app, showing how much of the allocated rewards were actually distributed. Optionally filter by range (3M=13 rounds, 6M=26 rounds, 1Y=52 rounds, All=no limit).",
+        "operationId": "getDistributionPerformance",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "query",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Time range filter. 3M=last 13 rounds, 6M=last 26 rounds, 1Y=last 52 rounds, All=no limit.",
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "enum": [
+                "3M",
+                "6M",
+                "1Y",
+                "All"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DistributionPerformanceItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get distribution performance for an app",
+        "tags": [
+          "B3TR - X-Allocations"
+        ]
+      }
+    },
     "/api/v1/b3tr/xallocations/earnings": {
       "get": {
         "description": "Returns earnings distribution for a specific app and/or round. At least one parameter (appId or roundId) must be provided. If both are provided, returns earnings for that specific app and round. If only appId is provided, returns earnings for that app across all rounds. If only roundId is provided, returns earnings for all apps in that round.",
@@ -8187,6 +9563,104 @@
           }
         },
         "summary": "Get XAllocation earnings distribution",
+        "tags": [
+          "B3TR - X-Allocations"
+        ]
+      }
+    },
+    "/api/v1/b3tr/xallocations/reward-details": {
+      "get": {
+        "description": "Returns aggregated reward details including total allocation earnings, total distributed, distribution performance, and actions rewarded.",
+        "operationId": "getRewardDetails",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "query",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardDetailsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get reward details for an app",
         "tags": [
           "B3TR - X-Allocations"
         ]
@@ -15992,6 +17466,1890 @@
         ]
       }
     },
+    "/api/v1/xapp/apps/{appId}/badges": {
+      "get": {
+        "operationId": "getAppBadges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BadgeSummary"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get badge summary for an app. Returns all three badge types with stats.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/earned": {
+      "get": {
+        "operationId": "getEarnedBadges",
+        "parameters": [
+          {
+            "description": "The unique identifier of the app.",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppEarnedBadgesResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get all earned badges for an app, grouped by badge type with count and latest round.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/previousRound": {
+      "get": {
+        "operationId": "getPreviousRoundBadges",
+        "parameters": [
+          {
+            "description": "The unique identifier of the app.",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPreviousRoundBadgeResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get the badges and rankings for an app in the previous round.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/public": {
+      "get": {
+        "operationId": "getPublicBadges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BadgeAward"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get public badges for app detail display. Returns badges from the latest round that are published.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/roundRank": {
+      "get": {
+        "operationId": "getBadgeRoundRank",
+        "parameters": [
+          {
+            "description": "The unique identifier of the app.",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The type of badge to query. Allowed values: topEcosystemDapp, topDistributionPerformer, navigatorsPick.",
+            "in": "query",
+            "name": "badgeType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeRoundRankResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get badge rank for the previous round, along with total count and latest round.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/stats": {
+      "get": {
+        "operationId": "getBadgeStats",
+        "parameters": [
+          {
+            "description": "The unique identifier of the app.",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The type of badge to query. Allowed values: topEcosystemDapp, topDistributionPerformer, navigatorsPick.",
+            "in": "query",
+            "name": "badgeType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeStatsResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get badge stats: total count, latest round, and all round rankings.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/{badgeType}": {
+      "get": {
+        "operationId": "getBadgeDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "badgeType",
+            "required": true,
+            "schema": {
+              "enum": [
+                "topEcosystemDapp",
+                "topDistributionPerformer",
+                "navigatorsPick"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeDetail"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get badge detail for a specific badge type.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/{badgeType}/records": {
+      "get": {
+        "operationId": "getBadgeRecords",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "badgeType",
+            "required": true,
+            "schema": {
+              "enum": [
+                "topEcosystemDapp",
+                "topDistributionPerformer",
+                "navigatorsPick"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The zero-based results page number",
+            "example": 0,
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The results page size",
+            "example": 20,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 150,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The sort direction",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "DESC",
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseBadgeRecord"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get paginated badge award records for a specific badge type.",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/badges/{badgeType}/visibility": {
+      "put": {
+        "operationId": "updateBadgeVisibility",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "badgeType",
+            "required": true,
+            "schema": {
+              "enum": [
+                "topEcosystemDapp",
+                "topDistributionPerformer",
+                "navigatorsPick"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BadgeVisibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeDetail"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Update badge visibility (Published/Unpublished).",
+        "tags": [
+          "XApp - Badges"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/eligibility": {
+      "get": {
+        "description": "UX pre-check backed by the indexer's all-time action summary (totalRewardAmount > 0 for this app+wallet). This mirrors the on-chain guard (VeBetterPassport.userUniqueAppInteraction, set when a reward is distributed); the XAppReviewManager contract remains the authoritative enforcer.",
+        "operationId": "getEligibility",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet address to check",
+            "in": "query",
+            "name": "wallet",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EligibilityResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Check whether a wallet may rate/review an app (received a reward from it).",
+        "tags": [
+          "XApp - Eligibility"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/rating": {
+      "get": {
+        "description": "Optionally pass ?wallet= to include the current user's rating and hasRated flag.",
+        "operationId": "getAppRating",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Current user's wallet address (optional, adds userRating + hasRated to response)",
+            "in": "query",
+            "name": "wallet",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRatingSummary"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get the average rating and rater count for an app.",
+        "tags": [
+          "XApp - Ratings"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/ratings/{wallet}": {
+      "get": {
+        "operationId": "getUserRating",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A valid address",
+            "example": "0xf077b491b355e64048ce21e3a6fc4751eeea77fa",
+            "in": "path",
+            "name": "wallet",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{40}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRatingDetail"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get the rating a specific wallet gave an app.",
+        "tags": [
+          "XApp - Ratings"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/reviews": {
+      "get": {
+        "description": "Returns reviews enriched with vote percentages, author domain, and current user's vote. Hidden reviews are included if the viewer is the author, the app's admin (X2EarnApps.isAppAdmin), or holds a review-manager admin/moderator role (XAppReviewManager DEFAULT_ADMIN_ROLE / MODERATOR_ROLE). Sort options: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews.",
+        "operationId": "getAppReviews",
+        "parameters": [
+          {
+            "description": "App ID to query by.",
+            "example": "0x2fc30c2ad41a2994061efaf218f1d52dc92bc4a31a0f02a4916490076a7a393a",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wallet",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The zero-based results page number",
+            "example": 0,
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The results page size",
+            "example": 20,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 150,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The sort direction",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "DESC",
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort field: newest (default, by time), most_upvotes (by upvote count), most_downvotes (by downvote count), most_reports (by report count), my_reviews (viewer's own reviews, requires wallet)",
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by author address (checksummed format)",
+            "in": "query",
+            "name": "author",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCountResponseReviewWithVotes"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get reviews for an app with vote stats and user context.",
+        "tags": [
+          "XApp - Reviews"
+        ]
+      }
+    },
+    "/api/v1/xapp/apps/{appId}/scores/previousRound": {
+      "get": {
+        "operationId": "getAppPreviousScore",
+        "parameters": [
+          {
+            "description": "App identifier",
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPreviousScoreResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get app score, rank, round date for the previous round.",
+        "tags": [
+          "XApp - Scoring"
+        ]
+      }
+    },
+    "/api/v1/xapp/reviews/{reviewId}": {
+      "get": {
+        "operationId": "getReview",
+        "parameters": [
+          {
+            "description": "Review ID",
+            "example": 6,
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewWithVotes"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get a single review by ID.",
+        "tags": [
+          "XApp - Reviews"
+        ]
+      }
+    },
+    "/api/v1/xapp/reviews/{reviewId}/votes": {
+      "get": {
+        "operationId": "getReviewVotes",
+        "parameters": [
+          {
+            "description": "Review ID",
+            "example": 6,
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Search by voter address or domain name (e.g. '0x123...' or 'jun.vet')",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The zero-based results page number",
+            "example": 0,
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The results page size",
+            "example": 20,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 150,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The sort direction",
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "DESC",
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseReviewVoteDetail"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get paginated vote history for a review.",
+        "tags": [
+          "XApp - Reviews"
+        ]
+      }
+    },
+    "/api/v1/xapp/reviews/{reviewId}/votes/stats": {
+      "get": {
+        "operationId": "getVoteStats",
+        "parameters": [
+          {
+            "description": "Review ID",
+            "example": 6,
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XProjectIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewVoteStats"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Validation errors occurred, eg: invalid input"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Access to the requested resource is forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            },
+            "description": "Service not available"
+          }
+        },
+        "summary": "Get aggregated vote statistics for a review.",
+        "tags": [
+          "XApp - Reviews"
+        ]
+      }
+    },
     "/api/v2/accounts/total": {
       "get": {
         "description": "Returns the total accounts observed on VeChain.",
@@ -17175,24 +20533,24 @@
   ],
   "tags": [
     {
-      "description": "Query VeBetterDAO navigators — professional voting delegates who stake B3TR and vote on behalf of citizens.",
-      "name": "B3TR Navigators"
+      "description": "Query indexed XApp star ratings.",
+      "name": "XApp - Ratings"
     },
     {
       "description": "Stargate related queries",
       "name": "Stargate"
     },
     {
-      "description": "Indexer API for VeVote.",
-      "name": "VeVote"
+      "description": "Query and manage XApp badge awards.",
+      "name": "XApp - Badges"
+    },
+    {
+      "description": "Query indexed XApp reviews.",
+      "name": "XApp - Reviews"
     },
     {
       "description": "Query indexed B3TR challenges.",
       "name": "B3TR - Challenges"
-    },
-    {
-      "description": "Combined VOT3 and B3TR balance richlist and holder rank.",
-      "name": "B3TR - Richlist"
     },
     {
       "description": "Safe multisig membership, proposals, and transaction state",
@@ -17205,10 +20563,6 @@
     {
       "description": "Information about smart contracts",
       "name": "Contracts"
-    },
-    {
-      "description": "Query XAllocation voting data on VeBetterDAO.",
-      "name": "B3TR - X-Allocations"
     },
     {
       "description": "Treasury B3TR transfers with categories",
@@ -17227,8 +20581,8 @@
       "name": "NFT"
     },
     {
-      "description": "Query blockchain transfer events",
-      "name": "TransferEvent"
+      "description": "Reward-eligibility pre-check for rating/review.",
+      "name": "XApp - Eligibility"
     },
     {
       "description": "Query VeVote Historic Proposals",
@@ -17243,16 +20597,40 @@
       "name": "Validator"
     },
     {
+      "description": "VeChain Thor Accounts",
+      "name": "Accounts"
+    },
+    {
+      "description": "Query VeBetterDAO navigators — professional voting delegates who stake B3TR and vote on behalf of citizens.",
+      "name": "B3TR Navigators"
+    },
+    {
+      "description": "Indexer API for VeVote.",
+      "name": "VeVote"
+    },
+    {
+      "description": "Combined VOT3 and B3TR balance richlist and holder rank.",
+      "name": "B3TR - Richlist"
+    },
+    {
+      "description": "Query XAllocation voting data on VeBetterDAO.",
+      "name": "B3TR - X-Allocations"
+    },
+    {
+      "description": "Query XApp scoring data.",
+      "name": "XApp - Scoring"
+    },
+    {
+      "description": "Query blockchain transfer events",
+      "name": "TransferEvent"
+    },
+    {
       "description": "Endpoints for B3TR Actions.",
       "name": "B3TR - Actions"
     },
     {
       "description": "Blockchain explorer analytics",
       "name": "Explorer"
-    },
-    {
-      "description": "VeChain Thor Accounts",
-      "name": "Accounts"
     },
     {
       "description": "Leaderboards for B3TR Actions.",
