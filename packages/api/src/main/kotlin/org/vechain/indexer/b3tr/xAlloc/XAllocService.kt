@@ -105,11 +105,7 @@ open class XAllocService(
         }
 
         val allEarnings = xAllocResultRepository.findByAppId(appId)
-        if (allEarnings.isEmpty()) return emptyList()
-
-        val sortedRoundIds = allEarnings.map { it.roundId }.distinct().sorted()
-        val limit = RANGE_LIMITS[normalizedRange]
-        val roundIds = if (limit != null) sortedRoundIds.takeLast(limit) else sortedRoundIds
+        val roundIds = resolveRoundIds(normalizedRange)
 
         val earningsByRound =
             allEarnings.filter { it.roundId in roundIds }.associateBy { it.roundId }
@@ -149,6 +145,21 @@ open class XAllocService(
                 distributionPerformance = performance,
             )
         }
+    }
+
+    /**
+     * Resolve the round window to surface for [normalizedRange], always derived from the latest
+     * global cycle. Apps with no or partial earnings still receive a zero-valued item for every
+     * round in the requested range — mirroring the roundUserStats endpoint.
+     */
+    private fun resolveRoundIds(normalizedRange: String?): List<Int> {
+        val previousRound = (cycleInfoRepo.findTopByOrderByRoundIdDesc()?.roundId ?: 0) - 1
+        if (previousRound < 1) return emptyList()
+
+        val limit = RANGE_LIMITS[normalizedRange]
+        val fromRound = if (limit != null) previousRound - (limit - 1) else 1
+        val safeFromRound = maxOf(1, fromRound)
+        return (safeFromRound..previousRound).toList().sorted()
     }
 
     open fun getRewardDetails(appId: String): RewardDetailsResponse {
