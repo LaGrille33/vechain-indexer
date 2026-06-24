@@ -38,19 +38,19 @@ $$ProfileScore = StaticScore \times (0.8 + 0.2 \times RecencyFactor) \quad (0 \l
 
 对于每个dApp，定义以下指标：
 
-- **WAU_7d**：过去7天内执行至少一个有效操作的独特钱包数量
+- **WAU_7d**：某个轮次内执行至少一个有效操作的独特钱包数量
   ```
-  WAU_7d = 过去7天执行至少一个有效操作的钱包数
-  ```
-
-- **NewUsers_7d**：过去7天内首次与该dApp交互的钱包数量
-  ```
-  NewUsers_7d = 过去7天首次交互的钱包数
+  WAU_7d = 某个轮次内执行至少一个有效操作的钱包数
   ```
 
-- **Actions_7d**：过去7天内执行的有效可奖励操作总数
+- **NewUsers_7d**：某个轮次内首次与该dApp交互的钱包数量
   ```
-  Actions_7d = 过去7天有效操作总数
+  NewUsers_7d = 某个轮次内首次交互的钱包数
+  ```
+
+- **Actions_7d**：某个轮次内执行的有效可奖励操作总数
+  ```
+  Actions_7d = 某个轮次内有效操作总数
   ```
 
 ### 对数缩放（Log Scaling）

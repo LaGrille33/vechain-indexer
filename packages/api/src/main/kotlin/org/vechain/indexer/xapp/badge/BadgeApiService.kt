@@ -96,7 +96,8 @@ open class BadgeApiService(
         val type = BadgeType.fromValue(badgeType)
         val awards = repository.findAllByAppIdAndBadgeType(appId, type)
         val rankByRound = awards.associateBy { it.round }
-        val allCycles = cycleInfoRepository.findAll().sortedByDescending { it.roundId }
+        // Exclude the latest round — it is still in progress and its results are not finalized yet.
+        val allCycles = cycleInfoRepository.findAll().sortedByDescending { it.roundId }.drop(1)
         return BadgeStatsResponse(
             badgeType = type,
             totalBadgesEarned = awards.size,

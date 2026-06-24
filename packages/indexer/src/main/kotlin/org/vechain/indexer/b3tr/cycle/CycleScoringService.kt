@@ -16,7 +16,6 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.onchain.AppOnchainScore
@@ -101,10 +100,10 @@ class CycleScoringService(
         var tier: String? = null,
     )
 
-    @Scheduled(
-        fixedDelayString = "\${indexer.cycle-scoring.interval-ms:7200000}",
-        initialDelayString = "\${indexer.cycle-scoring.initial-delay-ms:30000}",
-    )
+    //    @Scheduled(
+    //        fixedDelayString = "\${indexer.cycle-scoring.interval-ms:7200000}",
+    //        initialDelayString = "\${indexer.cycle-scoring.initial-delay-ms:30000}",
+    //    )
     fun runCycleScoring() {
         try {
             runCycleScoringInternal()
