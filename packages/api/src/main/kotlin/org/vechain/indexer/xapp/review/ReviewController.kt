@@ -33,9 +33,8 @@ open class ReviewController(private val service: ReviewApiService) {
         summary = "Get reviews for an app with vote stats and user context.",
         description =
             "Returns reviews enriched with vote percentages, author domain, and current user's vote. " +
-                "Hidden reviews are included if the viewer is the author, the app's admin " +
-                "(X2EarnApps.isAppAdmin), or holds a review-manager admin/moderator role " +
-                "(XAppReviewManager DEFAULT_ADMIN_ROLE / MODERATOR_ROLE). " +
+                "Hidden reviews are included if the viewer is the author or holds a review-manager " +
+                "admin/moderator role (XAppReviewManager DEFAULT_ADMIN_ROLE / MODERATOR_ROLE). " +
                 "Sort options: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews.",
     )
     @AppIdParameter(required = true, `in` = ParameterIn.PATH)
