@@ -14,6 +14,10 @@ interface ReviewRepository : BaseIndexedRepository<Review, String> {
     @Query("{ 'appId': ?0, 'isHidden': false }")
     fun findAllByAppId(appId: String, pageable: Pageable): Slice<Review>
 
+    /** Returns every review for the app, including hidden ones (used for app admins / roles). */
+    @Query("{ 'appId': ?0 }")
+    fun findAllByAppIdIncludingHidden(appId: String, pageable: Pageable): Slice<Review>
+
     @Query("{ 'appId': ?0, 'author': ?1 }")
     fun findAllByAppIdAndAuthor(appId: String, author: String, pageable: Pageable): Slice<Review>
 
@@ -38,6 +42,9 @@ interface ReviewRepository : BaseIndexedRepository<Review, String> {
     ): Slice<Review>
 
     fun countByAppIdAndIsHiddenFalse(appId: String): Long
+
+    /** Total review count for the app regardless of hidden state. */
+    fun countByAppId(appId: String): Long
 
     fun countByAppIdAndAuthor(appId: String, author: String): Long
 

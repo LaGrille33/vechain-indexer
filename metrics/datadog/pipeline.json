@@ -195,9 +195,21 @@
         },
         {
           "filter": {
+            "query": "@http.url_details.path:\"/api/v1/b3tr/xallocations/distribution-performance\""
+          },
+          "name": "/api/v1/b3tr/xallocations/distribution-performance"
+        },
+        {
+          "filter": {
             "query": "@http.url_details.path:\"/api/v1/b3tr/xallocations/earnings\""
           },
           "name": "/api/v1/b3tr/xallocations/earnings"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:\"/api/v1/b3tr/xallocations/reward-details\""
+          },
+          "name": "/api/v1/b3tr/xallocations/reward-details"
         },
         {
           "filter": {
@@ -441,6 +453,18 @@
         },
         {
           "filter": {
+            "query": "@http.url_details.path:/api/v1/b3tr/actions/apps/*/roundUserStats"
+          },
+          "name": "/api/v1/b3tr/actions/apps/{appId}/roundUserStats"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/b3tr/actions/apps/*/userCount"
+          },
+          "name": "/api/v1/b3tr/actions/apps/{appId}/userCount"
+        },
+        {
+          "filter": {
             "query": "@http.url_details.path:/api/v1/b3tr/actions/leaderboards/apps/*"
           },
           "name": "/api/v1/b3tr/actions/leaderboards/apps/{appId}"
@@ -462,6 +486,48 @@
             "query": "@http.url_details.path:/api/v1/b3tr/users/*/proposals/comments"
           },
           "name": "/api/v1/b3tr/users/{wallet}/proposals/comments"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/earned"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/earned"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/previousRound"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/previousRound"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/public"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/public"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/roundRank"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/roundRank"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/stats"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/stats"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/scores/previousRound"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/scores/previousRound"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/reviews/*/votes/stats"
+          },
+          "name": "/api/v1/xapp/reviews/{reviewId}/votes/stats"
         },
         {
           "filter": {
@@ -540,6 +606,36 @@
             "query": "@http.url_details.path:/api/v1/validators/blocks/historic/*"
           },
           "name": "/api/v1/validators/blocks/historic/{validator}"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/eligibility"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/eligibility"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/rating"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/rating"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/reviews"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/reviews"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/reviews/*/votes"
+          },
+          "name": "/api/v1/xapp/reviews/{reviewId}/votes"
         },
         {
           "filter": {
@@ -639,6 +735,12 @@
         },
         {
           "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/reviews/*"
+          },
+          "name": "/api/v1/xapp/reviews/{reviewId}"
+        },
+        {
+          "filter": {
             "query": "@http.url_details.path:/api/v2/history/token/*"
           },
           "name": "/api/v2/history/token/{tokenId}"
@@ -687,9 +789,33 @@
         },
         {
           "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/*/records"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/{badgeType}/records"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/*/visibility"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/{badgeType}/visibility"
+        },
+        {
+          "filter": {
             "query": "@http.url_details.path:/api/v1/safes/*/transactions/*/state"
           },
           "name": "/api/v1/safes/{safe}/transactions/{txHash}/state"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/badges/*"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/badges/{badgeType}"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp/apps/*/ratings/*"
+          },
+          "name": "/api/v1/xapp/apps/{appId}/ratings/{wallet}"
         },
         {
           "filter": {
@@ -782,6 +908,12 @@
             "query": "@http.url_details.path:/api/v1/vevote*"
           },
           "name": "v1-vevote"
+        },
+        {
+          "filter": {
+            "query": "@http.url_details.path:/api/v1/xapp*"
+          },
+          "name": "v1-xapp"
         },
         {
           "filter": {

@@ -28,6 +28,8 @@ class OpenApiActiveProfilesResolverTest {
                     "validator",
                     "validator-reward",
                     "vevote",
+                    "xapp-badge",
+                    "xapp-review",
                 )
         } finally {
             restoreProperty(previous)
