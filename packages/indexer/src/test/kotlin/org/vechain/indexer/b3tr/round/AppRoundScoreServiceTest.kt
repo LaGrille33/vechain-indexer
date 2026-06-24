@@ -54,7 +54,7 @@ internal class AppRoundScoreServiceTest {
     private val xAllocVotingContract = "0x9819ba0daaeae450e3d0f5cd4e3adafb2475a632"
 
     /** Round to score — change to a round that has data in `b3tr_app_action_summaries_round`. */
-    private val roundId = 7
+    private val roundId = 16
 
     private val mongoTemplate = MongoTemplate(MongoClients.create(mongoUri), databaseName)
 
