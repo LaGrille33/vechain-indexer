@@ -53,6 +53,12 @@ internal class AppRoundScoreServiceTest {
     /** XAllocationVoting proxy address on [thorUrl] (dev value, see packages/indexer/.env.dev). */
     private val xAllocVotingContract = "0x9819ba0daaeae450e3d0f5cd4e3adafb2475a632"
 
+    /**
+     * XAppReviewManager proxy address on [thorUrl] (testnet-staging). Used to read the
+     * governance-adjustable Community Score R_min; falls back to 20 if the contract is unreachable.
+     */
+    private val reviewManagerContractAddress = "0xba00fef0e9f9fa3b52f87b791219c6f74d6e038e"
+
     /** Round to score — change to a round that has data in `b3tr_app_action_summaries_round`. */
     private val roundId = 16
 
@@ -62,7 +68,13 @@ internal class AppRoundScoreServiceTest {
 
     @Test
     fun `onFirstSeenCompleted scores a real round and prints results`() {
-        val service = AppRoundScoreService(mongoTemplate, thorClient, xAllocVotingContract)
+        val service =
+            AppRoundScoreService(
+                mongoTemplate,
+                thorClient,
+                xAllocVotingContract,
+                reviewManagerContractAddress,
+            )
 
         // Hint: print the rounds that actually have action-summary data, in case roundId needs
         // adjusting before running.

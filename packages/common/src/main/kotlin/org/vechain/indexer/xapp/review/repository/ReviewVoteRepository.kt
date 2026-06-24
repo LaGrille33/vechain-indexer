@@ -15,7 +15,10 @@ interface ReviewVoteRepository : BaseIndexedRepository<ReviewVoteDoc, String> {
     fun findAllByReviewId(reviewId: Long, pageable: Pageable): Slice<ReviewVoteDoc>
 
     @Query("{ 'reviewId': ?0, 'voter': ?1 }")
-    fun findByReviewIdAndVoter(reviewId: Long, voter: String): ReviewVoteDoc?
+    fun findAllByReviewIdAndVoter(reviewId: Long, voter: String): List<ReviewVoteDoc>
+
+    @Query("{ 'reviewId': { '\$in': ?0 }, 'voter': ?1 }")
+    fun findByReviewIdInAndVoter(reviewIds: Collection<Long>, voter: String): List<ReviewVoteDoc>
 
     @Query("{ 'voter': ?0 }")
     fun findAllByVoter(voter: String, pageable: Pageable): Slice<ReviewVoteDoc>

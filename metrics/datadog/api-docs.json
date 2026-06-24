@@ -3741,11 +3741,17 @@
             "example": false,
             "type": "boolean"
           },
-          "myVoteType": {
-            "description": "Current user's vote type on this review (0=none, 1=upvote, 2=downvote, 3=report)",
-            "example": 1,
-            "format": "int32",
-            "type": "integer"
+          "myVoteTypes": {
+            "description": "Vote types the current user has cast on this review (1=upvote, 2=downvote, 3=report; empty if none)",
+            "example": [
+              1
+            ],
+            "items": {
+              "description": "Vote types the current user has cast on this review (1=upvote, 2=downvote, 3=report; empty if none)",
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
           },
           "reports": {
             "$ref": "#/components/schemas/VoteTypeStats"
@@ -3779,7 +3785,7 @@
           "createdAt",
           "downvotes",
           "isHidden",
-          "myVoteType",
+          "myVoteTypes",
           "reports",
           "reviewId",
           "title",

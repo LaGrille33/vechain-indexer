@@ -34,7 +34,7 @@ open class ReviewApiService(
      * my_reviews (filter to viewer's own reviews).
      *
      * If [viewer] is provided, hidden reviews authored by [viewer] are included and
-     * [ReviewWithVotes.myVoteType] is populated. All hidden reviews are also visible when [viewer]
+     * [ReviewWithVotes.myVoteTypes] is populated. All hidden reviews are also visible when [viewer]
      * is the app's admin or holds a review-manager admin/moderator role (see
      * [ReviewHiddenVisibilityResolver]).
      */
@@ -130,7 +130,7 @@ open class ReviewApiService(
                 review.toWithVotes(
                     authorDomain = domainsMap[review.author],
                     stats = stats,
-                    myVoteType = userVotesMap[review.reviewId] ?: 0,
+                    myVoteTypes = userVotesMap[review.reviewId] ?: emptyList(),
                 )
             }
 
@@ -154,7 +154,7 @@ open class ReviewApiService(
             } catch (_: Exception) {
                 null
             }
-        return review.toWithVotes(authorDomain = domain, stats = stats, myVoteType = 0)
+        return review.toWithVotes(authorDomain = domain, stats = stats, myVoteTypes = emptyList())
     }
 
     open fun getVoteStats(reviewId: Long): ReviewVoteStats {
@@ -274,11 +274,13 @@ open class ReviewApiService(
         }
     }
 
-    /** Batch-load a user's vote type for a list of review IDs. */
-    private fun batchUserVotes(reviewIds: List<Long>, voter: String): Map<Long, Int> {
+    /** Batch-load the vote types a user has cast for a list of review IDs. */
+    private fun batchUserVotes(reviewIds: List<Long>, voter: String): Map<Long, List<Int>> {
         if (reviewIds.isEmpty()) return emptyMap()
-        val ids = reviewIds.map { ReviewVoteDoc.documentId(it, normalise(voter)) }
-        return reviewVoteRepository.findAllById(ids).associate { it.reviewId to it.voteType }
+        return reviewVoteRepository
+            .findByReviewIdInAndVoter(reviewIds, normalise(voter))
+            .groupBy { it.reviewId }
+            .mapValues { (_, votes) -> votes.map { it.voteType }.sorted() }
     }
 
     private val zeroStats =
@@ -292,7 +294,7 @@ open class ReviewApiService(
     private fun Review.toWithVotes(
         authorDomain: String?,
         stats: ReviewVoteStats,
-        myVoteType: Int,
+        myVoteTypes: List<Int>,
     ): ReviewWithVotes =
         ReviewWithVotes(
             reviewId = reviewId,
@@ -308,7 +310,7 @@ open class ReviewApiService(
             upvotes = stats.upvotes,
             downvotes = stats.downvotes,
             reports = stats.reports,
-            myVoteType = myVoteType,
+            myVoteTypes = myVoteTypes,
         )
 
     private fun ReviewVoteDoc.toDetail(): ReviewVoteDetail =

@@ -70,7 +70,7 @@ open class ReviewVoteService(
             val voter = values["voter"]?.toString()?.let { normalise(it) } ?: continue
             val voteType = (values["voteType"] as? Number)?.toInt() ?: continue
 
-            val docId = ReviewVoteDoc.documentId(reviewId, voter)
+            val docId = ReviewVoteDoc.documentId(reviewId, voter, voteType)
             val (existing, nextVersion) = accumulator.resolve(docId)
 
             val updated =
@@ -169,6 +169,7 @@ open class ReviewVoteService(
                 ?: values["reviewId"]?.toString()?.toLongOrNull()
                 ?: return null
         val voter = values["voter"]?.toString()?.let { normalise(it) } ?: return null
-        return ReviewVoteDoc.documentId(reviewId, voter)
+        val voteType = (values["voteType"] as? Number)?.toInt() ?: return null
+        return ReviewVoteDoc.documentId(reviewId, voter, voteType)
     }
 }

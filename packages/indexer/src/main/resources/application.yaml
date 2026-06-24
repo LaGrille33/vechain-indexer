@@ -249,7 +249,10 @@ indexer:
     safe-tx-state: ${VERSION_SAFE_TX_STATE:1}
     safe-tx-proposals: ${VERSION_SAFE_TX_PROPOSALS:1}
     xapp-review: ${VERSION_XAPP_REVIEW:1}
-    xapp-review-vote: ${VERSION_XAPP_REVIEW_VOTE:1}
+    # Bumped 1 -> 2: vote documents now key by {reviewId}_{voter}_{voteType} (a voter may hold all
+    # three vote types). Drop+rebuilds xapp_review_votes. Pair with INDEXER_START_BLOCK_XAPP_REVIEW_VOTE
+    # set to the XAppReviewManager v4 upgrade block so legacy single-vote events aren't replayed.
+    xapp-review-vote: ${VERSION_XAPP_REVIEW_VOTE:2}
     xapp-rating: ${VERSION_XAPP_RATING:1}
     xapp-metadata: ${VERSION_XAPP_METADATA:1}
   healthcheck:

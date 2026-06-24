@@ -248,6 +248,19 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "newMinRatings",
+        "type": "uint256"
+      }
+    ],
+    "name": "CommunityScoreMinRatingsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "uint64",
         "name": "version",
@@ -525,6 +538,19 @@
   },
   {
     "inputs": [],
+    "name": "DEFAULT_COMMUNITY_SCORE_MIN_RATINGS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_CONTENT_LENGTH",
     "outputs": [
       {
@@ -609,6 +635,19 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "communityScoreMinRatings",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -889,12 +928,22 @@
         "type": "address"
       }
     ],
-    "name": "getUserVote",
+    "name": "getUserVotes",
     "outputs": [
       {
-        "internalType": "enum XAppReviewManager.VoteType",
-        "name": "",
-        "type": "uint8"
+        "internalType": "bool",
+        "name": "upvoted",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "downvoted",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "reported",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -1041,6 +1090,19 @@
       }
     ],
     "name": "revokeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_minRatings",
+        "type": "uint256"
+      }
+    ],
+    "name": "setCommunityScoreMinRatings",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
