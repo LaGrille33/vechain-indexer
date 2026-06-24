@@ -58,8 +58,8 @@ data class ReviewWithVotes(
     @Schema(description = "Report statistics") val reports: VoteTypeStats,
     @Schema(
         description =
-            "Current user's vote type on this review (0=none, 1=upvote, 2=downvote, 3=report)",
-        example = "1",
+            "Vote types the current user has cast on this review (1=upvote, 2=downvote, 3=report; empty if none)",
+        example = "[1]",
     )
-    val myVoteType: Int,
+    val myVoteTypes: List<Int>,
 )

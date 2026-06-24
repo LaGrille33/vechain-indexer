@@ -8,17 +8,17 @@ import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.VersionedDocument
 
 /**
- * A single user's vote on a review.
+ * A single vote of a given type on a review.
  *
- * Each user can have at most one active vote per review (upsert semantics). Changing a vote (e.g.
- * from UPVOTE to DOWNVOTE) updates the existing document keyed by "{reviewId}_{voter}".
+ * A voter may hold up to one document per VoteType on the same review — votes of different types
+ * coexist and are not cancellable. The document is keyed by "{reviewId}_{voter}_{voteType}".
  */
-@Schema(description = "Review vote record (one per user per review)")
+@Schema(description = "Review vote record (one per review, voter, and vote type)")
 @Document(collection = IndexerNames.XAPP_REVIEW_VOTE.COLLECTION)
 data class ReviewVoteDoc
 @ConstructorBinding
 constructor(
-    @Id @Schema(description = "MongoDB document ID ({reviewId}_{voter})") val id: String,
+    @Id @Schema(description = "MongoDB document ID ({reviewId}_{voter}_{voteType})") val id: String,
     @Schema(description = "Document version") override val version: Int,
     @Schema(description = "Block hash") override val blockId: String,
     @Schema(description = "Block number", example = "15000000") override val blockNumber: Long,
@@ -48,7 +48,7 @@ constructor(
         timestamp: Long,
         domain: String? = null,
     ) : this(
-        id = documentId(reviewId, voter),
+        id = documentId(reviewId, voter, voteType),
         version = version,
         blockId = blockId,
         blockNumber = blockNumber,
@@ -63,6 +63,7 @@ constructor(
     override fun getDocumentId(): String = id
 
     companion object {
-        fun documentId(reviewId: Long, voter: String): String = "${reviewId}_$voter"
+        fun documentId(reviewId: Long, voter: String, voteType: Int): String =
+            "${reviewId}_${voter}_$voteType"
     }
 }

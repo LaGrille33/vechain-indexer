@@ -42,6 +42,12 @@ open class ReviewVoteCollectionConfig(
                     ReviewVoteDoc::voter.name to Sort.Direction.ASC,
                     ReviewVoteDoc::reviewId.name to Sort.Direction.ASC,
                 ),
+                // Serves "which vote types has this user cast on these reviews?" lookups.
+                buildIndex(
+                    ReviewVoteDoc::reviewId.name to Sort.Direction.ASC,
+                    ReviewVoteDoc::voter.name to Sort.Direction.ASC,
+                    ReviewVoteDoc::voteType.name to Sort.Direction.ASC,
+                ),
             )
         )
     }

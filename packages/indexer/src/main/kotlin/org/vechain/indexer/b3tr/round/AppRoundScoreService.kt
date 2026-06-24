@@ -106,6 +106,8 @@ class AppRoundScoreService(
     private val thorClient: ThorClient,
     @param:Value("\${business-event.substitutions.X_ALLOC_VOTING_CONTRACT}")
     private val xAllocVotingContract: String,
+    @param:Value("\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT}")
+    private val reviewManagerContractAddress: String,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -119,6 +121,47 @@ class AppRoundScoreService(
             it.name == "getAppIdsOfRound"
         } ?: throw IllegalArgumentException("Function 'getAppIdsOfRound' not found in ABI")
     }
+
+    /**
+     * ABI for `XAppReviewManager.communityScoreMinRatings() -> uint256`, the governance-adjustable
+     * minimum-ratings threshold for a non-zero Community Score. Loaded lazily from `abis/b3tr`.
+     */
+    private val communityScoreMinRatingsAbi: AbiElement by lazy {
+        AbiLoader.loadFunctions("abis/b3tr", listOf("communityScoreMinRatings")).firstOrNull {
+            it.name == "communityScoreMinRatings"
+        } ?: throw IllegalArgumentException("Function 'communityScoreMinRatings' not found in ABI")
+    }
+
+    /**
+     * Reads the governance-adjustable Community Score minimum-ratings threshold
+     * (`XAppReviewManager.communityScoreMinRatings()`) at the best block. Falls back to [R_MIN]
+     * (20) when the call reverts/fails or returns 0 (e.g. right after an upgrade, before
+     * `setCommunityScoreMinRatings` is called), so scoring never treats every app as eligible.
+     */
+    private fun readCommunityScoreMinRatings(): Long =
+        try {
+            runBlocking {
+                val clause =
+                    ContractUtils.createClause(
+                        reviewManagerContractAddress,
+                        communityScoreMinRatingsAbi,
+                    )
+                val response = thorClient.inspectClauses(listOf(clause)).first()
+                if (response.reverted) {
+                    logger.warn("communityScoreMinRatings() reverted: {}", response.vmError)
+                    return@runBlocking R_MIN
+                }
+                val data = response.data
+                if (data.isBlank() || data == "0x") return@runBlocking R_MIN
+                val decoded =
+                    FunctionReturnDecoder.decode(data, communityScoreMinRatingsAbi.outputs)
+                val value = (decoded[""] as? Number)?.toLong() ?: return@runBlocking R_MIN
+                if (value <= 0L) R_MIN else value
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to read communityScoreMinRatings; falling back to {}", R_MIN, e)
+            R_MIN
+        }
 
     companion object {
         // Weights from the proposal
@@ -973,6 +1016,9 @@ class AppRoundScoreService(
         val ratingStats = aggregateCommunityRatingStats()
         if (ratingStats.isEmpty()) return emptyMap()
 
+        // R_min is governance-adjustable on-chain (XAppReviewManager.communityScoreMinRatings).
+        val rMin = readCommunityScoreMinRatings()
+
         val voteStats = aggregateCommunityVoteStats()
 
         // Compute adjusted rating for each app with rating data
@@ -987,7 +1033,7 @@ class AppRoundScoreService(
                     helpfulVotes = vs?.helpfulVotes ?: 0L,
                     unhelpfulVotes = vs?.unhelpfulVotes ?: 0L,
                 )
-            data.adjustedRating = computeAdjustedRating(data)
+            data.adjustedRating = computeAdjustedRating(data, rMin)
             appDataList.add(data)
         }
 
@@ -995,7 +1041,7 @@ class AppRoundScoreService(
         val allAdjustedRatings = appDataList.map { it.adjustedRating }
         for (data in appDataList) {
             data.communityScore =
-                if (data.numRatings < R_MIN) BigDecimal.ZERO
+                if (data.numRatings < rMin) BigDecimal.ZERO
                 else percentileRank(data.adjustedRating, allAdjustedRatings)
         }
 
@@ -1113,8 +1159,8 @@ class AppRoundScoreService(
     /**
      * AdjustedRating = AvgRating * ConfidenceFactor * EngagementFactor (0 when NumRatings < R_min).
      */
-    private fun computeAdjustedRating(data: CommunityAppData): BigDecimal {
-        if (data.numRatings < R_MIN) return BigDecimal.ZERO
+    private fun computeAdjustedRating(data: CommunityAppData, rMin: Long): BigDecimal {
+        if (data.numRatings < rMin) return BigDecimal.ZERO
         val confidenceFactor = computeConfidenceFactor(data.numRatings)
         val helpfulRatio = computeHelpfulRatio(data.helpfulVotes, data.unhelpfulVotes)
         val engagementFactor = computeEngagementFactor(helpfulRatio)
