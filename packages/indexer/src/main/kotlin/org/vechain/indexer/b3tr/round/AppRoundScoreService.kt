@@ -94,9 +94,11 @@ import org.vechain.indexer.xapp.badge.BadgeType
  *    metadata document get `ProfileScore = 0`.
  *
  * ## Total Score algorithm
- * Composite of the four dimension scores, persisted as `totalScore`: `TotalScore = 0.3 ×
- * ActivityScore + 0.3 × DistributionScore + 0.3 × CommunityScore + 0.1 × ProfileScore`, in `[0,
- * 100]`.
+ * Each dimension's weighted contribution is persisted as a `*FinalScore` field, rounded to 2 dp:
+ * `activityFinalScore = 0.3 × ActivityScore`, `distributionFinalScore = 0.3 × DistributionScore`,
+ * `communityFinalScore = 0.3 × CommunityScore`, `profileFinalScore = 0.1 × ProfileScore`. The
+ * composite `totalScore` is the sum of those four already-2-dp final scores (so the four final
+ * scores sum exactly to `totalScore`), in `[0, 100]`.
  */
 @Service
 @Profile("b3tr", "b3tr-app-round-score")
@@ -480,24 +482,35 @@ class AppRoundScoreService(
             // Profile Score (round-independent snapshot merged into this app's round document)
             val profile = profileScores[appId]
 
-            // Total Score (VBD Reputation Layer Proposal, Total Score)
+            // Persisted dimension scores (4 dp). The final (weighted) scores below are derived from
+            // these exact stored values, so each *FinalScore is reproducible as <dimensionScore> ×
+            // <weight> and the four final scores sum exactly to totalScore.
+            val activityScoreValue = activityScore.setScale(4, RoundingMode.HALF_UP)
+            val distributionScoreValue = distScore.setScale(4, RoundingMode.HALF_UP)
+            val communityScoreValue =
+                (community?.communityScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP)
+            val profileScoreValue =
+                (profile?.profileScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP)
+
+            // Weighted contributions (VBD Reputation Layer Proposal, Total Score), each rounded to
+            // 2 dp: Activity/Distribution/Community × 30%, Profile × 10%.
+            val activityFinalScore =
+                activityScoreValue.multiply(WEIGHT_ACTIVITY).setScale(2, RoundingMode.HALF_UP)
+            val distributionFinalScore =
+                distributionScoreValue
+                    .multiply(WEIGHT_DISTRIBUTION)
+                    .setScale(2, RoundingMode.HALF_UP)
+            val communityFinalScore =
+                communityScoreValue.multiply(WEIGHT_COMMUNITY).setScale(2, RoundingMode.HALF_UP)
+            val profileFinalScore =
+                profileScoreValue.multiply(WEIGHT_PROFILE).setScale(2, RoundingMode.HALF_UP)
+
+            // Total Score = sum of the four rounded final scores, persisted as `totalScore`.
             val totalScore =
-                WEIGHT_ACTIVITY.multiply(activityScore, COMMUNITY_MC)
-                    .add(WEIGHT_DISTRIBUTION.multiply(distScore, COMMUNITY_MC), COMMUNITY_MC)
-                    .add(
-                        WEIGHT_COMMUNITY.multiply(
-                            community?.communityScore ?: BigDecimal.ZERO,
-                            COMMUNITY_MC,
-                        ),
-                        COMMUNITY_MC,
-                    )
-                    .add(
-                        WEIGHT_PROFILE.multiply(
-                            profile?.profileScore ?: BigDecimal.ZERO,
-                            COMMUNITY_MC,
-                        ),
-                        COMMUNITY_MC,
-                    )
+                activityFinalScore
+                    .add(distributionFinalScore)
+                    .add(communityFinalScore)
+                    .add(profileFinalScore)
 
             val id = "${appId}_$roundId"
             val update =
@@ -511,11 +524,11 @@ class AppRoundScoreService(
                     .set("pWau", pWau.setScale(4, RoundingMode.HALF_UP))
                     .set("pNewUsers", pNew.setScale(4, RoundingMode.HALF_UP))
                     .set("pActions", pAct.setScale(4, RoundingMode.HALF_UP))
-                    .set("activityScore", activityScore.setScale(4, RoundingMode.HALF_UP))
+                    .set("activityScore", activityScoreValue)
                     .set("allocB3tr", allocB3tr.setScale(6, RoundingMode.HALF_UP))
                     .set("distributedB3tr", distB3tr.setScale(6, RoundingMode.HALF_UP))
                     .set("distributionEfficiency", distEff.setScale(6, RoundingMode.HALF_UP))
-                    .set("distributionScore", distScore.setScale(4, RoundingMode.HALF_UP))
+                    .set("distributionScore", distributionScoreValue)
                     .set(
                         "avgRating",
                         (community?.avgRating ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
@@ -551,13 +564,7 @@ class AppRoundScoreService(
                             RoundingMode.HALF_UP,
                         ),
                     )
-                    .set(
-                        "communityScore",
-                        (community?.communityScore ?: BigDecimal.ZERO).setScale(
-                            4,
-                            RoundingMode.HALF_UP,
-                        ),
-                    )
+                    .set("communityScore", communityScoreValue)
                     .set("optionalFieldsCount", profile?.optionalFieldsCount ?: 0)
                     .set(
                         "staticScore",
@@ -584,17 +591,16 @@ class AppRoundScoreService(
                             RoundingMode.HALF_UP,
                         ),
                     )
-                    .set(
-                        "profileScore",
-                        (profile?.profileScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
-                    )
-                    .set("totalScore", totalScore.setScale(4, RoundingMode.HALF_UP))
+                    .set("profileScore", profileScoreValue)
+                    .set("activityFinalScore", activityFinalScore)
+                    .set("distributionFinalScore", distributionFinalScore)
+                    .set("communityFinalScore", communityFinalScore)
+                    .set("profileFinalScore", profileFinalScore)
+                    .set("totalScore", totalScore)
                     .set("updatedAt", now)
-            // Rank on the persisted 4-dp totalScore (the same value written above) so `rank` stays
+            // Rank on the persisted totalScore (the same value written above) so `rank` stays
             // consistent with awardTopPercentageBadge, which ranks against the stored value.
-            pending.add(
-                PendingScoreUpsert(appId, totalScore.setScale(4, RoundingMode.HALF_UP), update)
-            )
+            pending.add(PendingScoreUpsert(appId, totalScore, update))
         }
 
         // 5. Rank within the round (competition ranking, appId tie-break), then bulk upsert.
