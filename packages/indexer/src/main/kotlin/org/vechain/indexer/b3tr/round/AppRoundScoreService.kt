@@ -5,7 +5,6 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
 import java.math.RoundingMode
-import kotlin.math.ceil
 import kotlin.math.exp
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
@@ -259,6 +258,17 @@ class AppRoundScoreService(
 
     data class AppMetrics(val actions: Long, val wau: Long, val distributedB3tr: BigDecimal)
 
+    /**
+     * A per-app score document assembled in the first pass of [scoreRound], awaiting its `rank`.
+     * The `rank` field is filled in the second pass, once every app's [totalScore] is known and the
+     * within-round ranking can be computed (see [rankByTotalScore]).
+     */
+    private data class PendingScoreUpsert(
+        val appId: String,
+        val totalScore: BigDecimal,
+        val update: Update,
+    )
+
     // ──────────────────────────── Entry point ────────────────────────────
 
     @EventListener
@@ -387,10 +397,11 @@ class AppRoundScoreService(
         // that have a metadata document.
         val profileScores = computeProfileScores(onChainAppIds)
 
-        // 4. Build and persist per-app score documents
+        // 4. Build per-app score documents. The `rank` field depends on every app's totalScore, so
+        // the upserts are deferred: the first pass computes components and assembles each Update,
+        // the second pass fills `rank` once the round is fully scored and executes the bulk write.
         val now = System.currentTimeMillis()
-        val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, targetCollection)
-        var count = 0
+        val pending = mutableListOf<PendingScoreUpsert>()
 
         for (appId in onChainAppIds) {
             val metrics = appMetrics[appId]
@@ -446,8 +457,7 @@ class AppRoundScoreService(
                     )
 
             val id = "${appId}_$roundId"
-            bulkOps.upsert(
-                Query(Criteria.where("_id").`is`(id)),
+            val update =
                 Update()
                     .set("_id", id)
                     .set("appId", appId)
@@ -536,16 +546,52 @@ class AppRoundScoreService(
                         (profile?.profileScore ?: BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
                     )
                     .set("totalScore", totalScore.setScale(4, RoundingMode.HALF_UP))
-                    .set("updatedAt", now),
+                    .set("updatedAt", now)
+            // Rank on the persisted 4-dp totalScore (the same value written above) so `rank` stays
+            // consistent with awardTopPercentageBadge, which ranks against the stored value.
+            pending.add(
+                PendingScoreUpsert(appId, totalScore.setScale(4, RoundingMode.HALF_UP), update)
             )
-            count++
         }
 
-        if (count > 0) {
+        // 5. Rank within the round (competition ranking, appId tie-break), then bulk upsert.
+        val rankByAppId = rankByTotalScore(pending.map { it.appId to it.totalScore })
+        if (pending.isNotEmpty()) {
+            val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, targetCollection)
+            for ((appId, _, update) in pending) {
+                update.set("rank", rankByAppId.getValue(appId))
+                bulkOps.upsert(Query(Criteria.where("_id").`is`("${appId}_$roundId")), update)
+            }
             bulkOps.execute()
         }
+        val count = pending.size
         logger.info("Round {} scored: {} apps", roundId, count)
         return count
+    }
+
+    /**
+     * Competition ranking ("1224") of [appIdScorePairs] by score descending, with `appId` ascending
+     * as a stable tie-break — the same convention as [awardTopPercentageBadge]. Apps with equal
+     * scores share the rank of the first position in their tie group; the next lower score jumps to
+     * its 1-based position. Returns an `appId` → 1-based rank map (empty for an empty population).
+     */
+    private fun rankByTotalScore(
+        appIdScorePairs: List<Pair<String, BigDecimal>>
+    ): Map<String, Int> {
+        if (appIdScorePairs.isEmpty()) return emptyMap()
+        val ranked =
+            appIdScorePairs.sortedWith(
+                compareByDescending<Pair<String, BigDecimal>> { it.second }.thenBy { it.first }
+            )
+        val ranks = HashMap<String, Int>(ranked.size)
+        var currentRank = 1
+        for (i in ranked.indices) {
+            if (i > 0 && ranked[i].second.compareTo(ranked[i - 1].second) != 0) {
+                currentRank = i + 1
+            }
+            ranks[ranked[i].first] = currentRank
+        }
+        return ranks
     }
 
     // ──────────────────────────── Badge awarding ────────────────────────────
@@ -555,6 +601,9 @@ class AppRoundScoreService(
         val appId: String,
         val totalScore: BigDecimal,
         val distributionScore: BigDecimal,
+        // Within-round competition rank by totalScore — the `rank` field persisted in
+        // b3tr_app_round_scores. 0 when the document has no rank (e.g. an un-backfilled round).
+        val rank: Int,
     )
 
     /**
@@ -593,6 +642,11 @@ class AppRoundScoreService(
                 BadgeType.TOP_ECOSYSTEM_DAPP,
                 valueSelector = { it.totalScore },
                 allowTieExpansion = true,
+                // Badge rank = the app's `rank` in b3tr_app_round_scores (within-round position by
+                // totalScore), not the recomputed top-10% rank.
+                rankSelector = { it.rank },
+                // Badge `score` = the app's totalScore from b3tr_app_round_scores.
+                scoreSelector = { it.totalScore },
                 now = now,
                 roundBlockTimestamp = roundBlockTimestamp,
             )
@@ -605,6 +659,8 @@ class AppRoundScoreService(
                 BadgeType.TOP_DISTRIBUTION_PERFORMER,
                 valueSelector = { it.distributionScore },
                 allowTieExpansion = false,
+                // Badge `score` = the app's distributionScore from b3tr_app_round_scores.
+                scoreSelector = { it.distributionScore },
                 now = now,
                 roundBlockTimestamp = roundBlockTimestamp,
             )
@@ -634,16 +690,23 @@ class AppRoundScoreService(
                 appId = appId,
                 totalScore = toBigDecimal(doc.get("totalScore")),
                 distributionScore = toBigDecimal(doc.get("distributionScore")),
+                rank = (doc.get("rank") as? Number)?.toInt() ?: 0,
             )
         }
     }
 
     /**
-     * Awards a badge of [badgeType] to the top 10% of [apps] (rounded up, minimum 1) as ranked by
-     * [valueSelector]. Sorting is by value descending, then by `appId` for stable ordering. Equal
-     * values share a rank; when [allowTieExpansion] is `true`, apps tied with the last in-top-10%
-     * entry are included as well. Each winner is upserted into [badgeCollection] keyed by
-     * `appId_badgeType_round`.
+     * Awards a badge of [badgeType] to the top 10% of [apps] (truncated, minimum 1 — e.g. 25 apps →
+     * 2 badges) as ranked by [valueSelector]. Sorting is by value descending, then by `appId` for
+     * stable ordering. Equal values share a rank; when [allowTieExpansion] is `true`, apps tied
+     * with the last in-top-10% entry are included as well. Each winner is upserted into
+     * [badgeCollection] keyed by `appId_badgeType_round`.
+     *
+     * The persisted badge `rank` defaults to the recomputed top-10% competition rank, but when
+     * [rankSelector] is supplied it is used instead — e.g. [BadgeType.TOP_ECOSYSTEM_DAPP] takes the
+     * app's `rank` straight from `b3tr_app_round_scores` (its within-round position by
+     * `totalScore`). When [scoreSelector] is supplied, the app's score is also persisted on the
+     * badge under `score` — e.g. [BadgeType.TOP_ECOSYSTEM_DAPP] records `totalScore`.
      */
     private fun awardTopPercentageBadge(
         badgeCollection: String,
@@ -652,6 +715,8 @@ class AppRoundScoreService(
         badgeType: BadgeType,
         valueSelector: (AppRoundScoreValue) -> BigDecimal,
         allowTieExpansion: Boolean,
+        rankSelector: ((AppRoundScoreValue) -> Int)? = null,
+        scoreSelector: ((AppRoundScoreValue) -> BigDecimal)? = null,
         now: Long,
         roundBlockTimestamp: Long?,
     ) {
@@ -663,8 +728,9 @@ class AppRoundScoreService(
                 compareByDescending<AppRoundScoreValue> { valueSelector(it) }.thenBy { it.appId }
             )
 
-        // Top 10%, rounded up (ceil). Minimum 1.
-        val topCount = maxOf(1, ceil(ranked.size * 0.1).toInt())
+        // Top 10%, truncating the remainder (e.g. 25 apps × 10% = 2.5 → 2 badges). Integer division
+        // keeps it exact (no floating-point error). Minimum 1, so the winner always gets one.
+        val topCount = maxOf(1, ranked.size / 10)
 
         // Assign ranks with tie handling
         val rankedApps = mutableListOf<Pair<AppRoundScoreValue, Int>>()
@@ -700,10 +766,14 @@ class AppRoundScoreService(
 
         // Bulk upsert badge awards
         val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, badgeCollection)
-        for ((app, rank) in rankedApps) {
+        for ((app, computedRank) in rankedApps) {
+            // Prefer the persisted round-score rank when a rankSelector is supplied (e.g.
+            // TOP_ECOSYSTEM_DAPP takes rank from b3tr_app_round_scores); fall back to the
+            // recomputed
+            // competition rank otherwise, or when the persisted rank is missing (0).
+            val rank = rankSelector?.let { sel -> sel(app).takeIf { r -> r > 0 } } ?: computedRank
             val id = "${app.appId}_${badgeType.value}_$roundId"
-            bulkOps.upsert(
-                Query(Criteria.where("_id").`is`(id)),
+            val update =
                 Update()
                     .set("_id", id)
                     .set("version", 1)
@@ -715,8 +785,11 @@ class AppRoundScoreService(
                     .set("round", roundId.toLong())
                     .set("rank", rank)
                     .set("isPublished", true)
-                    .set("roundBlockTimestamp", roundBlockTimestamp),
-            )
+                    .set("roundBlockTimestamp", roundBlockTimestamp)
+            // Optional `score` field, e.g. TOP_ECOSYSTEM_DAPP records the app's totalScore from
+            // b3tr_app_round_scores.
+            scoreSelector?.let { update.set("score", it(app)) }
+            bulkOps.upsert(Query(Criteria.where("_id").`is`(id)), update)
         }
         bulkOps.execute()
 
@@ -1278,5 +1351,9 @@ private fun toBigDecimal(value: Any?): BigDecimal =
         // Decimal128 (MongoDB driver) and other Number subtypes carry the full-precision value in
         // toString(), so round-tripping through the string avoids Double precision loss.
         is Number -> BigDecimal(value.toString())
+        // Score fields in b3tr_app_round_scores are persisted as strings (e.g. "73.8857") because
+        // scoreRound writes them via raw Update without a DECIMAL128 target type. Parse them so the
+        // badge ranking sees the real values — otherwise every app reads as 0 and ties for top 10%.
+        is String -> value.toBigDecimalOrNull() ?: BigDecimal.ZERO
         else -> BigDecimal.ZERO
     }

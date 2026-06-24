@@ -1,7 +1,7 @@
 # Solo 链部署信息
 
 - **部署日期**: 2026-06-04
-- **Thor Solo 节点地址**: `http://113.31.105.33:8669`
+- **Thor Solo 节点地址**: `https://vebetterdaothortest.smartcarbonlink.com`
 - **部署耗时**: 6 分 15 秒
 - **Solidity 版本**: 0.8.20, 优化器已开启, runs: 1
 - **助记词**: `denial kitchen pet squirrel other broom bar gas better priority spoil cross`
