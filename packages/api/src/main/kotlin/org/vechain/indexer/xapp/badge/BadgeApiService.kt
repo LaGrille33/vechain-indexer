@@ -1,5 +1,6 @@
 package org.vechain.indexer.xapp.badge
 
+import org.bson.Document
 import org.springframework.context.annotation.Profile
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Slice
@@ -9,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
 import org.springframework.stereotype.Service
+import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.IndexerService
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.rest.PaginatedResponse
@@ -144,14 +146,19 @@ open class BadgeApiService(
         val previousCycle = cycleInfoRepository.findByRoundId(previousRound)
         val awards = repository.findAllByAppId(appId).filter { it.round == previousRound.toLong() }
         val earnedByType = awards.associateBy { it.badgeType }
+        // Hide badges the app has marked private in its xapp_metadata badgeSettings: such a badge
+        // is
+        // reported as not earned (earned = 0) with no rank, regardless of the actual award.
+        val privateByType = loadBadgeSettings(appId)
         val badgeItems =
             BadgeType.entries.map { type ->
                 val award = earnedByType[type]
+                val isPrivate = privateByType[type.value] == true
                 BadgeAwardItem(
                     badgeType = type,
                     badgeName = BADGE_NAMES[type] ?: type.name,
-                    rank = award?.rank,
-                    earned = if (award != null) 1 else 0,
+                    rank = if (isPrivate) null else award?.rank,
+                    earned = if (isPrivate) 0 else if (award != null) 1 else 0,
                 )
             }
         return AppPreviousRoundBadgeResponse(
@@ -160,6 +167,27 @@ open class BadgeApiService(
             roundTimestamp = previousCycle?.blockTimestamp,
             badges = badgeItems,
         )
+    }
+
+    /**
+     * Reads the app's `badgeSettings` from [xapp_metadata][IndexerNames.XAPP_METADATA], returning a
+     * badge-type-value → `isPrivate` map for the three badge types. Returns an empty map when the
+     * app has no metadata document or no `badgeSettings`; a missing `isPrivate` defaults to
+     * `false`. The `_id` lookup uses the lower-cased appId, matching how `AppMetadataService`
+     * persists it.
+     */
+    private fun loadBadgeSettings(appId: String): Map<String, Boolean> {
+        val doc =
+            mongoTemplate.findOne(
+                Query(Criteria.where("_id").`is`(appId.lowercase())),
+                Document::class.java,
+                IndexerNames.XAPP_METADATA.COLLECTION,
+            ) ?: return emptyMap()
+        val settings = doc.get("badgeSettings", Document::class.java) ?: return emptyMap()
+        return BadgeType.entries.associate { type ->
+            val entry = settings.get(type.value, Document::class.java)
+            type.value to (entry?.getBoolean("isPrivate") ?: false)
+        }
     }
 
     open fun getEarnedBadges(appId: String): AppEarnedBadgesResponse {
