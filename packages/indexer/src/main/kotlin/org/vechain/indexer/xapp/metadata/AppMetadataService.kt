@@ -7,9 +7,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
 import org.springframework.data.mongodb.core.MongoTemplate
+import org.springframework.data.mongodb.core.query.Criteria
+import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.vechain.indexer.IndexedDocument
+import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.VersionedDocumentAccumulator
 import org.vechain.indexer.config.InlineVersioningProperties
 import org.vechain.indexer.event.AbiLoader
@@ -148,7 +152,8 @@ open class AppMetadataService(
      * Best-effort: any failure (contract revert, IPFS outage) is logged and swallowed so it never
      * blocks normal event processing. Apps whose metadata can't be resolved are simply skipped —
      * they'll be written later when their own `AppMetadataURIUpdated` event arrives. No-op (returns
-     * empty lists) once the collection is non-empty (`repository.count() > 0`). Returns the built
+     * empty lists) once any real app metadata exists — the collection's `__checkpoint__` doc is
+     * ignored so a fresh-but-checkpointed collection still triggers the backfill. Returns the built
      * `(updated, existing)` pair — like [processEvents] — for the caller to persist via [save] (so
      * the write goes through the `@Transactional` proxy rather than a self-invocation).
      */
@@ -159,8 +164,15 @@ open class AppMetadataService(
             emptyList<AppMetadata>() to emptyList()
         try {
             if (events.none { it.eventType == "AppMetadataURIUpdated" }) return skip
-            // Only backfill when the collection is truly empty; afterwards this is a cheap no-op.
-            if (repository.count() > 0L) return skip
+            // Only backfill when the collection holds no real app metadata. The indexer also keeps
+            // a __checkpoint__ doc in this collection (IndexedDocument.CHECKPOINT_ID), so a raw
+            // repository.count() is always >= 1 — exclude it. Afterwards this is a cheap no-op.
+            val appDocs =
+                mongoTemplate.count(
+                    Query(Criteria.where("_id").ne(IndexedDocument.CHECKPOINT_ID)),
+                    IndexerNames.XAPP_METADATA.COLLECTION,
+                )
+            if (appDocs > 0L) return skip
 
             val triggeringAppIds =
                 events
