@@ -30,6 +30,13 @@ open class AppMetadataProcessor(
     ) {
     override suspend fun processEntry(entry: IndexingResult) {
         if (entry.events().isEmpty()) return
+        // On a fresh database (empty xapp_metadata), backfill every other eligible app before
+        // processing the triggering event, so the collection isn't left with a single app. No-op
+        // once the collection is non-empty.
+        val (bootUpdated, bootExisting) = service.bootstrapIfEmpty(entry.events())
+        if (bootUpdated.isNotEmpty() || bootExisting.isNotEmpty()) {
+            service.save(bootUpdated, bootExisting)
+        }
         val (updated, existing) = service.processEvents(entry.events())
         if (updated.isNotEmpty() || existing.isNotEmpty()) {
             service.save(updated, existing)

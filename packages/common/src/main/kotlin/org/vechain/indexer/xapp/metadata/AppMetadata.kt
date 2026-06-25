@@ -21,6 +21,17 @@ data class AppMetadataVersionEntry(
 )
 
 /**
+ * Per-badge-type privacy setting declared inside an app's IPFS metadata JSON under
+ * `badgeSettings.<badgeTypeValue>`: `{"isPrivate": false}`. The key is the badge type value
+ * (`topEcosystemDapp` / `topDistributionPerformer` / `navigatorsPick`).
+ */
+@Schema(description = "Per-badge-type privacy setting from IPFS metadata")
+data class BadgeSetting(
+    @Schema(description = "Whether the badge is private (hidden)", example = "false")
+    val isPrivate: Boolean = false
+)
+
+/**
  * Current IPFS metadata snapshot for a single app, keyed by `appId`.
  *
  * Updated on every `AppMetadataURIUpdated` event from the X2EarnApps contract. Only the
@@ -65,6 +76,8 @@ constructor(
                 "more_details.ecosystem_partners"
     )
     val optionalFieldsCount: Int,
+    @Schema(description = "Per-badge-type privacy settings from the IPFS metadata JSON")
+    val badgeSettings: Map<String, BadgeSetting> = emptyMap(),
 ) : VersionedDocument {
     constructor(
         version: Int,
@@ -80,6 +93,7 @@ constructor(
         versionHistoryUpdated: Int,
         tweetsUpdated: Int,
         optionalFieldsCount: Int,
+        badgeSettings: Map<String, BadgeSetting> = emptyMap(),
     ) : this(
         id = documentId(appId),
         version = version,
@@ -95,6 +109,7 @@ constructor(
         versionHistoryUpdated = versionHistoryUpdated,
         tweetsUpdated = tweetsUpdated,
         optionalFieldsCount = optionalFieldsCount,
+        badgeSettings = badgeSettings,
     )
 
     override fun getDocumentId(): String = id
