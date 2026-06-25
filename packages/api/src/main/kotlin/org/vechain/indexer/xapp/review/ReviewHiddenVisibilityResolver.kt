@@ -13,21 +13,22 @@ import org.vechain.indexer.thor.AddressUtils
 import org.vechain.indexer.thor.HexUtils.normalise
 import org.vechain.indexer.thor.client.ThorClient
 import org.vechain.indexer.thor.model.BlockRevision
-import org.vechain.indexer.thor.model.Clause
 import org.vechain.indexer.thor.model.InspectionResult
 import org.vechain.indexer.transaction.TransactionUtils.isSuccessWithData
 import org.vechain.indexer.utils.ContractUtils
 import org.web3j.crypto.Hash
-import org.web3j.utils.Numeric
 
 /**
- * Decides whether a wallet may see hidden reviews of an app, by reading on-chain state at request
- * time (mirroring how the VeBetterDAO frontend resolves privileges via direct contract reads):
- * - the app's per-app admin: `X2EarnApps.isAppAdmin(appId, wallet)`
- * - a global review manager role: `XAppReviewManager.hasRole(MODERATOR_ROLE, wallet)` or
+ * Decides whether a wallet may see hidden reviews, by reading on-chain state at request time
+ * (mirroring how the VeBetterDAO frontend resolves privileges via direct contract reads):
+ * - a global review-manager role: `XAppReviewManager.hasRole(MODERATOR_ROLE, wallet)` or
  *   `hasRole(DEFAULT_ADMIN_ROLE, wallet)`
  *
- * The three checks are issued as a single batched `inspectClauses` call; if any returns true the
+ * App admins (`X2EarnApps.isAppAdmin`) are intentionally NOT granted hidden-review visibility; only
+ * review-manager admin/moderator roles are. (A hidden review's author still sees their own review
+ * via the repository query layer, independent of this resolver.)
+ *
+ * The two checks are issued as a single batched `inspectClauses` call; if either returns true the
  * wallet may see hidden reviews. Results are cached per appId+wallet for a short TTL, and any error
  * (node down, revert, decode failure) fails open to `false` so the endpoint degrades to the public
  * view instead of erroring.
@@ -36,8 +37,6 @@ import org.web3j.utils.Numeric
 @Service
 open class ReviewHiddenVisibilityResolver(
     private val thorClient: ThorClient,
-    @Value("\${business-event.substitutions.X2EARN_APPS_CONTRACT:\${X2EARN_APPS_CONTRACT:}}")
-    private val x2EarnAppsContract: String,
     @Value(
         "\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT:\${XAPP_REVIEW_MANAGER_CONTRACT:}}"
     )
@@ -54,17 +53,17 @@ open class ReviewHiddenVisibilityResolver(
     private val moderatorRole: ByteArray = Hash.sha3("MODERATOR_ROLE".toByteArray())
     private val defaultAdminRole: ByteArray = ByteArray(32)
 
-    private val isAppAdminAbi: AbiElement by lazy { loadAbi("abis/xapps", "isAppAdmin") }
     private val hasRoleAbi: AbiElement by lazy { loadAbi("abis/b3tr", "hasRole") }
 
     /**
-     * True if [wallet] is the admin of [appId] or holds a review-manager admin/moderator role.
-     * Returns false without hitting the node when neither contract is configured.
+     * True if [wallet] holds a review-manager admin/moderator role (XAppReviewManager
+     * DEFAULT_ADMIN_ROLE / MODERATOR_ROLE), granting visibility of hidden reviews for [appId].
+     * Returns false without hitting the node when the review-manager contract is not configured.
      */
     open fun canSeeHiddenReviews(appId: String, wallet: String): Boolean {
         val app = normalise(appId)
         val who = normalise(wallet)
-        if (x2EarnAppsContract.isBlank() && xAppReviewManagerContract.isBlank()) return false
+        if (xAppReviewManagerContract.isBlank()) return false
 
         val key = "$app:$who"
         val now = System.currentTimeMillis()
@@ -72,7 +71,7 @@ open class ReviewHiddenVisibilityResolver(
 
         val value =
             try {
-                checkOnChain(app, who)
+                checkOnChain(who)
             } catch (e: Exception) {
                 logger.warn(
                     "Failed to resolve hidden-review visibility for appId={} wallet={}: {}",
@@ -86,37 +85,24 @@ open class ReviewHiddenVisibilityResolver(
         return value
     }
 
-    private fun checkOnChain(appId: String, wallet: String): Boolean {
+    private fun checkOnChain(wallet: String): Boolean {
         val walletBigInt = AddressUtils.toBigInt(wallet)
-        val appIdBytes = Numeric.hexStringToByteArray(appId)
 
-        val clauses = mutableListOf<Clause>()
-        if (x2EarnAppsContract.isNotBlank()) {
-            clauses +=
-                ContractUtils.createClause(
-                    x2EarnAppsContract,
-                    isAppAdminAbi,
-                    appIdBytes,
-                    walletBigInt,
-                )
-        }
-        if (xAppReviewManagerContract.isNotBlank()) {
-            clauses +=
+        val clauses =
+            listOf(
                 ContractUtils.createClause(
                     xAppReviewManagerContract,
                     hasRoleAbi,
                     moderatorRole,
                     walletBigInt,
-                )
-            clauses +=
+                ),
                 ContractUtils.createClause(
                     xAppReviewManagerContract,
                     hasRoleAbi,
                     defaultAdminRole,
                     walletBigInt,
-                )
-        }
-        if (clauses.isEmpty()) return false
+                ),
+            )
 
         val responses = runBlocking {
             thorClient.inspectClauses(clauses, BlockRevision.Keyword.BEST)

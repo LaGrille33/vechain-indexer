@@ -314,32 +314,28 @@
         "description": "App score for the previous round",
         "properties": {
           "activity": {
-            "description": "Activity dimension score (0-20)",
-            "example": 12,
-            "format": "int32",
-            "type": "integer"
+            "description": "Activity dimension score (weighted, 0-100)",
+            "example": 28.8,
+            "type": "number"
           },
           "appId": {
             "description": "App identifier",
             "type": "string"
           },
           "community": {
-            "description": "Community dimension score (0-20)",
-            "example": 18,
-            "format": "int32",
-            "type": "integer"
+            "description": "Community dimension score (weighted, 0-100)",
+            "example": 12.86,
+            "type": "number"
           },
           "distribution": {
-            "description": "Distribution dimension score (0-20)",
-            "example": 15,
-            "format": "int32",
-            "type": "integer"
+            "description": "Distribution dimension score (weighted, 0-100)",
+            "example": 28.8,
+            "type": "number"
           },
           "health": {
-            "description": "Health dimension score (0-20)",
-            "example": 14,
-            "format": "int32",
-            "type": "integer"
+            "description": "Health (Profile) dimension score (weighted, 0-100)",
+            "example": 3.43,
+            "type": "number"
           },
           "rank": {
             "description": "Ranking",
@@ -360,10 +356,9 @@
             "type": "integer"
           },
           "score": {
-            "description": "App Score",
-            "example": 85,
-            "format": "int32",
-            "type": "integer"
+            "description": "App Score (composite Total Score, 0-100)",
+            "example": 73.89,
+            "type": "number"
           }
         },
         "required": [
@@ -18759,7 +18754,7 @@
     },
     "/api/v1/xapp/apps/{appId}/reviews": {
       "get": {
-        "description": "Returns reviews enriched with vote percentages, author domain, and current user's vote. Hidden reviews are included if the viewer is the author, the app's admin (X2EarnApps.isAppAdmin), or holds a review-manager admin/moderator role (XAppReviewManager DEFAULT_ADMIN_ROLE / MODERATOR_ROLE). Sort options: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews.",
+        "description": "Returns reviews enriched with vote percentages, author domain, and current user's vote. Hidden reviews are included if the viewer is the author or holds a review-manager admin/moderator role (XAppReviewManager DEFAULT_ADMIN_ROLE / MODERATOR_ROLE). Sort options: newest (default), most_upvotes, most_downvotes, most_reports, my_reviews.",
         "operationId": "getAppReviews",
         "parameters": [
           {

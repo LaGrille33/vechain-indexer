@@ -35,8 +35,7 @@ open class ReviewApiService(
      *
      * If [viewer] is provided, hidden reviews authored by [viewer] are included and
      * [ReviewWithVotes.myVoteTypes] is populated. All hidden reviews are also visible when [viewer]
-     * is the app's admin or holds a review-manager admin/moderator role (see
-     * [ReviewHiddenVisibilityResolver]).
+     * holds a review-manager admin/moderator role (see [ReviewHiddenVisibilityResolver]).
      */
     open fun getAppReviews(
         appId: String,
@@ -60,9 +59,10 @@ open class ReviewApiService(
 
         val effectiveAuthor = if (isMyReviews) viewer else author
 
-        // App admins and review-manager admin/moderator roles see every review, including hidden
-        // ones. The resolver reads on-chain state and fails open to false, so a missing/erroring
-        // resolver leaves the public view intact.
+        // Review-manager admin/moderator roles see every review, including hidden ones. The
+        // resolver
+        // reads on-chain state and fails open to false, so a missing/erroring resolver leaves the
+        // public view intact.
         val canSeeHidden =
             viewer != null && (visibilityResolver?.canSeeHiddenReviews(appId, viewer) ?: false)
 
