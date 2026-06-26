@@ -4,9 +4,7 @@ import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
 import kotlin.math.exp
-import kotlinx.coroutines.runBlocking
 import org.bson.Document
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
 import org.springframework.data.mongodb.core.MongoTemplate
@@ -16,11 +14,6 @@ import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.round.AppRoundScoreService
-import org.vechain.indexer.event.AbiLoader
-import org.vechain.indexer.event.model.abi.AbiElement
-import org.vechain.indexer.event.utils.FunctionReturnDecoder
-import org.vechain.indexer.thor.client.ThorClient
-import org.vechain.indexer.utils.ContractUtils
 
 /** Result of the Community Score computation for a single app. */
 data class CommunityScoreResult(
@@ -51,23 +44,16 @@ data class CommunityScoreResult(
 @Service
 open class CommunityScoreService(
     private val mongoTemplate: MongoTemplate,
-    private val thorClient: ThorClient,
-    @Value("\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT}")
-    private val reviewManagerContractAddress: String,
+    /**
+     * R_min — minimum ratings for a non-zero Community Score. From
+     * `indexer.community-score.min-ratings` (default 20).
+     */
+    @Value("\${indexer.community-score.min-ratings:20}") private val rMin: Long,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private const val R_MIN = 20L // Minimum ratings to be eligible (fallback default)
         private val K = BigDecimal("100") // Smoothing constant for ConfidenceFactor
         private val MC = MathContext(20, RoundingMode.HALF_UP)
-    }
-
-    /** ABI for `XAppReviewManager.communityScoreMinRatings() -> uint256`. */
-    private val communityScoreMinRatingsAbi: AbiElement by lazy {
-        AbiLoader.loadFunctions("abis/b3tr", listOf("communityScoreMinRatings")).firstOrNull {
-            it.name == "communityScoreMinRatings"
-        } ?: throw IllegalArgumentException("Function 'communityScoreMinRatings' not found in ABI")
     }
 
     /** Compute the Community Score for a specific app, or null if it has no rating data. */
@@ -82,8 +68,8 @@ open class CommunityScoreService(
         val ratingStats = aggregateRatingStats()
         if (ratingStats.isEmpty()) return emptyList()
 
-        // R_min is governance-adjustable on-chain (XAppReviewManager.communityScoreMinRatings).
-        val rMin = readCommunityScoreMinRatings()
+        // R_min (minimum ratings for a non-zero Community Score) is configured via
+        // `indexer.community-score.min-ratings` (default 20).
         val voteStats = aggregateVoteStats()
 
         // Compute adjusted rating for each app with rating data
@@ -221,39 +207,6 @@ open class CommunityScoreService(
         }
         return map
     }
-
-    // ── On-chain R_min ─────────────────────────────────────────────────────
-
-    /**
-     * Reads the governance-adjustable Community Score minimum-ratings threshold
-     * (`XAppReviewManager.communityScoreMinRatings()`) at the best block. Falls back to [R_MIN]
-     * (20) when the call reverts/fails or returns 0 (e.g. right after an upgrade, before
-     * `setCommunityScoreMinRatings` is called), so scoring never treats every app as eligible.
-     */
-    private fun readCommunityScoreMinRatings(): Long =
-        try {
-            runBlocking {
-                val clause =
-                    ContractUtils.createClause(
-                        reviewManagerContractAddress,
-                        communityScoreMinRatingsAbi,
-                    )
-                val response = thorClient.inspectClauses(listOf(clause)).first()
-                if (response.reverted) {
-                    logger.warn("communityScoreMinRatings() reverted: {}", response.vmError)
-                    return@runBlocking R_MIN
-                }
-                val data = response.data
-                if (data.isBlank() || data == "0x") return@runBlocking R_MIN
-                val decoded =
-                    FunctionReturnDecoder.decode(data, communityScoreMinRatingsAbi.outputs)
-                val value = (decoded[""] as? Number)?.toLong() ?: return@runBlocking R_MIN
-                if (value <= 0L) R_MIN else value
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to read communityScoreMinRatings; falling back to {}", R_MIN, e)
-            R_MIN
-        }
 
     // ── Formula components ────────────────────────────────────────────────
 

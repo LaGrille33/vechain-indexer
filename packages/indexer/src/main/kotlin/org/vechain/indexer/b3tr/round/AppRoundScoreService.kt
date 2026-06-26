@@ -107,8 +107,11 @@ class AppRoundScoreService(
     private val thorClient: ThorClient,
     @param:Value("\${business-event.substitutions.X_ALLOC_VOTING_CONTRACT}")
     private val xAllocVotingContract: String,
-    @param:Value("\${business-event.substitutions.XAPP_REVIEW_MANAGER_CONTRACT}")
-    private val reviewManagerContractAddress: String,
+    /**
+     * R_min — minimum ratings for a non-zero Community Score. From
+     * `indexer.community-score.min-ratings` (default 20).
+     */
+    @param:Value("\${indexer.community-score.min-ratings:20}") private val rMin: Long,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -123,47 +126,6 @@ class AppRoundScoreService(
         } ?: throw IllegalArgumentException("Function 'getAppIdsOfRound' not found in ABI")
     }
 
-    /**
-     * ABI for `XAppReviewManager.communityScoreMinRatings() -> uint256`, the governance-adjustable
-     * minimum-ratings threshold for a non-zero Community Score. Loaded lazily from `abis/b3tr`.
-     */
-    private val communityScoreMinRatingsAbi: AbiElement by lazy {
-        AbiLoader.loadFunctions("abis/b3tr", listOf("communityScoreMinRatings")).firstOrNull {
-            it.name == "communityScoreMinRatings"
-        } ?: throw IllegalArgumentException("Function 'communityScoreMinRatings' not found in ABI")
-    }
-
-    /**
-     * Reads the governance-adjustable Community Score minimum-ratings threshold
-     * (`XAppReviewManager.communityScoreMinRatings()`) at the best block. Falls back to [R_MIN]
-     * (20) when the call reverts/fails or returns 0 (e.g. right after an upgrade, before
-     * `setCommunityScoreMinRatings` is called), so scoring never treats every app as eligible.
-     */
-    private fun readCommunityScoreMinRatings(): Long =
-        try {
-            runBlocking {
-                val clause =
-                    ContractUtils.createClause(
-                        reviewManagerContractAddress,
-                        communityScoreMinRatingsAbi,
-                    )
-                val response = thorClient.inspectClauses(listOf(clause)).first()
-                if (response.reverted) {
-                    logger.warn("communityScoreMinRatings() reverted: {}", response.vmError)
-                    return@runBlocking R_MIN
-                }
-                val data = response.data
-                if (data.isBlank() || data == "0x") return@runBlocking R_MIN
-                val decoded =
-                    FunctionReturnDecoder.decode(data, communityScoreMinRatingsAbi.outputs)
-                val value = (decoded[""] as? Number)?.toLong() ?: return@runBlocking R_MIN
-                if (value <= 0L) R_MIN else value
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to read communityScoreMinRatings; falling back to {}", R_MIN, e)
-            R_MIN
-        }
-
     companion object {
         // Weights from the proposal
         private val WEIGHT_WAU = BigDecimal("0.5")
@@ -174,7 +136,6 @@ class AppRoundScoreService(
         private val HALF = BigDecimal("0.5")
 
         // Community Score constants (VBD Reputation Layer Proposal, Community Score)
-        private const val R_MIN = 20L // Minimum ratings to be eligible
         private val K = BigDecimal("100") // Smoothing constant for ConfidenceFactor
         private val COMMUNITY_MC = MathContext(20, RoundingMode.HALF_UP)
 
@@ -1095,8 +1056,8 @@ class AppRoundScoreService(
         val ratingStats = aggregateCommunityRatingStats()
         if (ratingStats.isEmpty()) return emptyMap()
 
-        // R_min is governance-adjustable on-chain (XAppReviewManager.communityScoreMinRatings).
-        val rMin = readCommunityScoreMinRatings()
+        // R_min (minimum ratings for a non-zero Community Score) is configured via
+        // `indexer.community-score.min-ratings` (default 20).
 
         val voteStats = aggregateCommunityVoteStats()
 

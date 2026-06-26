@@ -139,6 +139,8 @@ indexer:
   cycle-info:
     interval-ms: ${INDEXER_CYCLE_INFO_INTERVAL_MS:300000}
     initial-delay-ms: ${INDEXER_CYCLE_INFO_INITIAL_DELAY_MS:60000}
+  community-score:
+    min-ratings: ${XAPP_COMMUNITY_SCORE_MIN_RATINGS:20}
   discord:
     bot-token: ${DISCORD_BOT_TOKEN:}
     channels: ${DISCORD_CHANNELS:}

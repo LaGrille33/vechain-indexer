@@ -15,29 +15,19 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.aggregation.Aggregation
 import org.springframework.data.mongodb.core.aggregation.AggregationResults
 import org.vechain.indexer.IndexerNames
-import org.vechain.indexer.thor.client.ThorClient
 
 @ExtendWith(MockKExtension::class)
 class CommunityScoreServiceTest {
 
     @MockK private lateinit var mongoTemplate: MongoTemplate
 
-    // thorClient is left unstubbed: the on-chain R_min read is wrapped in try/catch and falls back
-    // to R_MIN (20) when inspectClauses has no answer, so the tests below use the default
-    // threshold.
-    @MockK private lateinit var thorClient: ThorClient
-
     private lateinit var communityScoreService: CommunityScoreService
 
     @BeforeEach
     fun setUp() {
         MockKAnnotations.init(this)
-        communityScoreService =
-            CommunityScoreService(
-                mongoTemplate,
-                thorClient,
-                "0x0000000000000000000000000000000000000000",
-            )
+        // R_min (20) is now a constructor param from config; no on-chain read.
+        communityScoreService = CommunityScoreService(mongoTemplate, 20L)
     }
 
     /**

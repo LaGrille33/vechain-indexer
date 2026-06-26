@@ -68,7 +68,7 @@ internal class AppRoundScoreAwardBadgesTest {
 
     @Test
     fun `awardBadges awards xApp badges for a real round and prints results`() {
-        val service = AppRoundScoreService(mongoTemplate, thorClient, xAllocVotingContract)
+        val service = AppRoundScoreService(mongoTemplate, thorClient, xAllocVotingContract, 20L)
 
         val before = badgesForRound(roundId)
         println(
