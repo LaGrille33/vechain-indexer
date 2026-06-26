@@ -59,6 +59,9 @@ internal class AppRoundScoreAwardBadgesTest {
     /** XAllocationVoting proxy address on [thorUrl] (dev value, see packages/indexer/.env.dev). */
     private val xAllocVotingContract = "0x9819ba0daaeae450e3d0f5cd4e3adafb2475a632"
 
+    /** XAppReviewManager proxy address on [thorUrl] (mirrors AppRoundScoreServiceTest). */
+    private val reviewManagerContractAddress = "0xba00fef0e9f9fa3b52f87b791219c6f74d6e038e"
+
     /** Round to award badges for — must have rows in `b3tr_app_round_scores`. */
     private val roundId = 12
 

@@ -36,6 +36,7 @@ class IpfsMetadataClient(
         val versionHistory: List<AppMetadataVersionEntry>,
         val tweets: List<String>,
         val optionalFieldsCount: Int = 0,
+        val badgeSettings: Map<String, BadgeSetting> = emptyMap(),
     )
 
     private val httpClient: HttpClient by lazy {
@@ -124,6 +125,22 @@ class IpfsMetadataClient(
     }
 
     /**
+     * Parses the `badgeSettings` object from the fetched metadata JSON into a badge-type-value →
+     * [BadgeSetting] map. Each entry is `{"isPrivate": bool}`; a missing or non-object
+     * `badgeSettings` yields an empty map, and a missing `isPrivate` defaults to `false`.
+     */
+    private fun parseBadgeSettings(root: JsonNode): Map<String, BadgeSetting> {
+        val node = root.path("badgeSettings")
+        if (!node.isObject) return emptyMap()
+        val result = LinkedHashMap<String, BadgeSetting>()
+        node.fieldNames().forEach { key ->
+            result[key] =
+                BadgeSetting(isPrivate = node.path(key).path("isPrivate").asBoolean(false))
+        }
+        return result
+    }
+
+    /**
      * Parses the fetched metadata JSON into [ResolvedAppMetadata]: version_history entries, tweet
      * URLs, and a count of the optional metadata fields the app has filled in. Extracted from
      * [resolve] so the pure parsing logic is unit-testable without HTTP.
@@ -133,6 +150,7 @@ class IpfsMetadataClient(
             versionHistory = parseVersionHistory(root),
             tweets = parseTweets(root),
             optionalFieldsCount = countOptionalFields(root),
+            badgeSettings = parseBadgeSettings(root),
         )
 
     /**
