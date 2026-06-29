@@ -112,6 +112,18 @@ class NavigatorVoteRoundReportAggregationService(
         val activeCitizens = navigatorCitizenRepository.findAll().filter { it.active }
         val citizenToNavigator =
             activeCitizens.associate { it.address.lowercase() to it.navigator.lowercase() }
+        val activeNavigatorAddresses =
+            mongoTemplate
+                .find(
+                    Query(
+                        Criteria.where("status")
+                            .`in`(NavigatorStatus.ACTIVE.name, NavigatorStatus.EXITING.name)
+                    ),
+                    Document::class.java,
+                    IndexerNames.NAVIGATOR.COLLECTION,
+                )
+                .mapNotNull { it.getString("_id")?.lowercase() }
+                .toSet()
 
         val voteQuery =
             Query(
@@ -136,7 +148,9 @@ class NavigatorVoteRoundReportAggregationService(
 
         votes.forEach { ev ->
             val voter = ((ev["from"] as? String) ?: (ev["origin"] as? String) ?: "").lowercase()
-            val navigator = citizenToNavigator[voter]
+            val navigator =
+                citizenToNavigator[voter]
+                    ?: if (activeNavigatorAddresses.contains(voter)) voter else null
             if (navigator.isNullOrBlank()) {
                 manualVotes++
                 return@forEach
