@@ -122,7 +122,10 @@ class NavigatorVoteRoundReportAggregationService(
                     Document::class.java,
                     IndexerNames.NAVIGATOR.COLLECTION,
                 )
-                .mapNotNull { it.getString("_id")?.lowercase() }
+                .mapNotNull { doc ->
+                    (doc.getString("address") ?: doc.getString("_id") ?: doc.get("_id")?.toString())
+                        ?.lowercase()
+                }
                 .toSet()
 
         val voteQuery =
