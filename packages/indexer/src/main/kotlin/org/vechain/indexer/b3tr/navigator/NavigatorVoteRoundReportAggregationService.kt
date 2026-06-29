@@ -151,9 +151,18 @@ class NavigatorVoteRoundReportAggregationService(
 
         votes.forEach { ev ->
             val voter = ((ev["from"] as? String) ?: (ev["origin"] as? String) ?: "").lowercase()
-            val navigator =
-                citizenToNavigator[voter]
-                    ?: if (activeNavigatorAddresses.contains(voter)) voter else null
+            val isActiveNavigatorVoter =
+                activeNavigatorAddresses.contains(voter) ||
+                    mongoTemplate.exists(
+                        Query(
+                            Criteria.where("_id")
+                                .`is`(voter)
+                                .and("status")
+                                .`in`(NavigatorStatus.ACTIVE.name, NavigatorStatus.EXITING.name)
+                        ),
+                        IndexerNames.NAVIGATOR.COLLECTION,
+                    )
+            val navigator = citizenToNavigator[voter] ?: if (isActiveNavigatorVoter) voter else null
             if (navigator.isNullOrBlank()) {
                 manualVotes++
                 return@forEach
