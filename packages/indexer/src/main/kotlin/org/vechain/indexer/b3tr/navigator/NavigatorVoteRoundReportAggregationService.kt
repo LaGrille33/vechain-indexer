@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
+import org.vechain.indexer.xapp.badge.BadgeType
 
 @Service
 @Profile("b3tr", "b3tr-navigator", "b3tr-navigator-vote-report")
@@ -28,6 +29,9 @@ class NavigatorVoteRoundReportAggregationService(
         private const val WATERMARK_ID = "navigator_vote_round_report_watermark"
         private const val WATERMARK_COLLECTION = "b3tr_navigator_vote_round_report_watermark"
         private const val HISTORY_EVENT_NAME = "B3TR_XALLOCATION_VOTE"
+
+        // Navigators Pick badge: number of top dApps (by navigator voting weight) that earn it.
+        private const val NAVIGATORS_PICK_TOP_N = 3
     }
 
     private data class RoundAggregationResult(
@@ -85,6 +89,12 @@ class NavigatorVoteRoundReportAggregationService(
                 result.dappRanking,
                 IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING.COLLECTION,
             )
+            // Award the navigatorsPick badge inline, right after the ranking is persisted. This is
+            // the single owner of that badge: keeping it here (rather than in the per-round scoring
+            // pipeline) guarantees the ranking exists when the badge is awarded, eliminating the
+            // race where awardBadges(round) ran before the ranking was built and silently skipped
+            // the badge with no retry.
+            awardNavigatorsPickBadges(result.dappRanking, cycle.blockTimestamp)
             logger.info(
                 "Navigator vote report aggregated for round {}: navigators={}, delegatedVotes={}, totalVotes={}, dapps={}",
                 roundId,
@@ -281,5 +291,42 @@ class NavigatorVoteRoundReportAggregationService(
             totalWeight = BigDecimal(totalWeight),
             dappRankings = rankedApps,
         )
+    }
+
+    /**
+     * Awards the [BadgeType.NAVIGATORS_PICK] badge to the top [NAVIGATORS_PICK_TOP_N] dApps of
+     * [ranking] (whose `dappRankings` are already 1-based and sorted by weight descending). Each
+     * winner is upserted into [xapp_badge_awards][IndexerNames.XAPP_BADGE_AWARD] keyed by
+     * `appId_navigatorsPick_round`, so re-running for a round is idempotent. The `appId` is
+     * lower-cased to match the `_id` convention of the other badge types. No-op when the ranking
+     * has no entries in the top N (e.g. no navigator votes for the round).
+     */
+    private fun awardNavigatorsPickBadges(
+        ranking: NavigatorDappVoteRoundRanking,
+        roundBlockTimestamp: Long,
+    ) {
+        val now = System.currentTimeMillis()
+        ranking.dappRankings
+            .filter { it.rank in 1..NAVIGATORS_PICK_TOP_N }
+            .forEach { entry ->
+                val appId = entry.appId.lowercase()
+                val id = "${appId}_${BadgeType.NAVIGATORS_PICK.value}_${ranking.roundId}"
+                mongoTemplate.upsert(
+                    Query(Criteria.where("_id").`is`(id)),
+                    Update()
+                        .set("_id", id)
+                        .set("version", 1)
+                        .set("blockId", "")
+                        .set("blockNumber", 0L)
+                        .set("blockTimestamp", now)
+                        .set("appId", appId)
+                        .set("badgeType", BadgeType.NAVIGATORS_PICK.value)
+                        .set("round", ranking.roundId.toLong())
+                        .set("rank", entry.rank)
+                        .set("isPublished", true)
+                        .set("roundBlockTimestamp", roundBlockTimestamp),
+                    IndexerNames.XAPP_BADGE_AWARD.COLLECTION,
+                )
+            }
     }
 }

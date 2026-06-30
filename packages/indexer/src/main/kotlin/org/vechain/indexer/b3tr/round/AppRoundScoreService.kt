@@ -156,9 +156,6 @@ class AppRoundScoreService(
         private val WEIGHT_COMMUNITY = BigDecimal("0.3")
         private val WEIGHT_PROFILE = BigDecimal("0.1")
 
-        // Navigators Pick badge: number of top dApps (by navigator voting weight) that earn it.
-        private const val NAVIGATORS_PICK_TOP_N = 3
-
         // ln1pBig helpers
         private val TWO = BigDecimal(2)
         private val LN2 = BigDecimal("0.69314718055994530941723212145817656807550013436025")
@@ -319,10 +316,10 @@ class AppRoundScoreService(
                 firstSeenAvailable = firstSeenAvailable,
             )
 
-        // Award xApp badges for this round (TOP_ECOSYSTEM_DAPP ranks by totalScore,
-        // TOP_DISTRIBUTION_PERFORMER by distributionScore, NAVIGATORS_PICK by navigator voting
-        // rank). Each badge type guards on its own data source, so this runs even when this round
-        // produced no scored apps (e.g. the navigator ranking can exist independently).
+        // Award the score-based xApp badges for this round (TOP_ECOSYSTEM_DAPP ranks by totalScore,
+        // TOP_DISTRIBUTION_PERFORMER by distributionScore). NAVIGATORS_PICK is awarded separately
+        // by
+        // NavigatorVoteRoundReportAggregationService, inline with building the navigator ranking.
         awardBadges(targetRound)
 
         val elapsed = System.currentTimeMillis() - started
@@ -676,9 +673,11 @@ class AppRoundScoreService(
             )
         }
 
-        // 3. Navigator精选徽章 (NAVIGATORS_PICK): top N by navigator voting weight. Independent of
-        // b3tr_app_round_scores — a round can have a navigator ranking without scored apps.
-        awardNavigatorsPickBadges(badgeCollection, roundId, now, roundBlockTimestamp)
+        // 3. Navigator精选徽章 (NAVIGATORS_PICK) is awarded by
+        // NavigatorVoteRoundReportAggregationService, inline right after it builds the per-round
+        // navigator dApp vote ranking. Awarding it there (rather than here) guarantees the ranking
+        // exists when the badge is written, eliminating the race where this per-round, one-shot
+        // trigger could run before the ranking was built and silently skip the badge with no retry.
     }
 
     /**
@@ -810,72 +809,6 @@ class AppRoundScoreService(
             badgeType.name,
             topCount,
             apps.size,
-        )
-    }
-
-    /**
-     * Awards the [BadgeType.NAVIGATORS_PICK] badge to the top [NAVIGATORS_PICK_TOP_N] dApps in
-     * [roundId] by navigator voting weight. The ranking lives in
-     * [b3tr_navigator_dapp_vote_round_rankings][IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING]:
-     * its `dappRankings` array is already ranked at write time (rank 1 = highest weight), so the
-     * entries with `rank ≤ [NAVIGATORS_PICK_TOP_N]` each get a
-     * [org.vechain.indexer.xapp.badge.BadgeAward], upserted into [badgeCollection] keyed by
-     * `appId_badgeType_round`. The `appId` is lower-cased to match the `_id` convention of the
-     * other badges (and `b3tr_app_round_scores.appId`). No-op if no ranking document exists for the
-     * round.
-     */
-    private fun awardNavigatorsPickBadges(
-        badgeCollection: String,
-        roundId: Int,
-        now: Long,
-        roundBlockTimestamp: Long?,
-    ) {
-        val doc =
-            mongoTemplate.findOne(
-                Query(Criteria.where("roundId").`is`(roundId)),
-                Document::class.java,
-                IndexerNames.NAVIGATOR_DAPP_VOTE_ROUND_RANKING.COLLECTION,
-            ) ?: return
-
-        val rankings = doc.get("dappRankings") as? List<*> ?: return
-        // dappRankings is written as NavigatorDappVoteRankingEntry; rank is already 1-based and
-        // sorted by weight descending. Keep the (rank, appId) pairs in the top N.
-        val winners =
-            rankings.mapNotNull { entry ->
-                val e = entry as? Document ?: return@mapNotNull null
-                val rank = (e.get("rank") as? Number)?.toInt() ?: return@mapNotNull null
-                val appId = e.getString("appId") ?: return@mapNotNull null
-                if (rank in 1..NAVIGATORS_PICK_TOP_N) rank to appId.lowercase() else null
-            }
-        if (winners.isEmpty()) return
-
-        val bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, badgeCollection)
-        for ((rank, appId) in winners) {
-            val id = "${appId}_${BadgeType.NAVIGATORS_PICK.value}_$roundId"
-            bulkOps.upsert(
-                Query(Criteria.where("_id").`is`(id)),
-                Update()
-                    .set("_id", id)
-                    .set("version", 1)
-                    .set("blockId", "")
-                    .set("blockNumber", 0L)
-                    .set("blockTimestamp", now)
-                    .set("appId", appId)
-                    .set("badgeType", BadgeType.NAVIGATORS_PICK.value)
-                    .set("round", roundId.toLong())
-                    .set("rank", rank)
-                    .set("isPublished", true)
-                    .set("roundBlockTimestamp", roundBlockTimestamp),
-            )
-        }
-        bulkOps.execute()
-
-        logger.info(
-            "Round {}: awarded {} {} badges (top {} of navigator rankings)",
-            roundId,
-            winners.size,
-            BadgeType.NAVIGATORS_PICK.name,
-            NAVIGATORS_PICK_TOP_N,
         )
     }
 
