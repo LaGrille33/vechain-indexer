@@ -63,10 +63,15 @@ class NavigatorVoteRoundReportAggregationService(
             )
         val lastProcessedRound = watermarkDoc?.getInteger("lastRoundId") ?: 0
 
-        if (latestCycle.roundId <= lastProcessedRound) {
+        // The latest cycle_info round is still in progress (votes not final), so only
+        // aggregate up to the previous (last completed) round. Mirrors
+        // UserFirstSeenAggregationService, which also targets latest - 1.
+        val latestCompletedRound = latestCycle.roundId - 1
+        if (latestCompletedRound <= lastProcessedRound) {
             logger.info(
-                "No new completed rounds to aggregate (latest={}, processed={})",
+                "No new completed rounds (latest={}, completed={}, processed={})",
                 latestCycle.roundId,
+                latestCompletedRound,
                 lastProcessedRound,
             )
             return
@@ -74,7 +79,7 @@ class NavigatorVoteRoundReportAggregationService(
 
         val allCycles =
             cycleInfoRepository
-                .findByRoundIdIn((lastProcessedRound + 1..latestCycle.roundId).toList())
+                .findByRoundIdIn((lastProcessedRound + 1..latestCompletedRound).toList())
                 .sortedBy { it.roundId }
         if (allCycles.isEmpty()) return
 
@@ -99,7 +104,7 @@ class NavigatorVoteRoundReportAggregationService(
         val now = System.currentTimeMillis()
         mongoTemplate.upsert(
             Query(Criteria.where("_id").`is`(WATERMARK_ID)),
-            Update.update("lastRoundId", latestCycle.roundId).set("updatedAt", now),
+            Update.update("lastRoundId", latestCompletedRound).set("updatedAt", now),
             WATERMARK_COLLECTION,
         )
     }
