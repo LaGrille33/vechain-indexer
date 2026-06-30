@@ -10,7 +10,6 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
@@ -35,10 +34,12 @@ class NavigatorVoteRoundReportAggregationService(
         val dappRanking: NavigatorDappVoteRoundRanking,
     )
 
-    @Scheduled(
-        fixedDelayString = "\${indexer.navigator-vote-report.interval-ms:60000}",
-        initialDelayString = "\${indexer.navigator-vote-report.initial-delay-ms:30000}",
-    )
+    /**
+     * Aggregates navigator vote round reports. Now triggered by
+     * [org.vechain.indexer.b3tr.userfirstseen.UserFirstSeenAggregationService.onCycleInfoCompleted]
+     * whenever new cycle info is synced, instead of a fixed-delay scheduler. The internal watermark
+     * makes this idempotent, so it is safe to invoke repeatedly.
+     */
     fun aggregateNavigatorVoteReports() {
         try {
             aggregateInternal()

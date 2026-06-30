@@ -3,6 +3,7 @@ package org.vechain.indexer.b3tr.userfirstseen
 import java.time.Instant
 import org.bson.Document
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.event.CycleInfoAggregationCompletedEvent
 import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
+import org.vechain.indexer.b3tr.navigator.NavigatorVoteRoundReportAggregationService
 import org.vechain.indexer.b3tr.round.repository.CycleInfoRepository
 import org.vechain.indexer.utils.IdUtils.generateId
 
@@ -25,6 +27,8 @@ class UserFirstSeenAggregationService(
     private val mongoTemplate: MongoTemplate,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val cycleInfoRepository: CycleInfoRepository,
+    private val navigatorVoteReportAggregationService:
+        ObjectProvider<NavigatorVoteRoundReportAggregationService>,
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -41,6 +45,11 @@ class UserFirstSeenAggregationService(
         }
         try {
             aggregateFirstSeen()
+            // Run the dependent navigator vote round report aggregation now that fresh
+            // cycle info is available. The bean is profile-gated and optional, so
+            // ifAvailable no-ops when absent. It has its own watermark and try/catch,
+            // so it is safe to call inline without affecting UserFirstSeen's flow.
+            navigatorVoteReportAggregationService.ifAvailable { it.aggregateNavigatorVoteReports() }
         } catch (e: Exception) {
             logger.error("UserFirstSeen aggregation failed", e)
         } finally {
