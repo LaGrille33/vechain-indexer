@@ -260,20 +260,28 @@ class NavigatorVoteRoundReportAggregationService(
             }
         }
 
+        val sortedApps =
+            totalWeightByApp.entries.sortedWith(
+                compareByDescending<Map.Entry<String, BigInteger>> { it.value }.thenBy { it.key }
+            )
+
+        // Standard competition ranking: apps with equal weight share the same rank,
+        // and the next rank skips ahead (e.g. weights 100,100,50,20,20 -> 1,1,3,4,4).
+        var rank = 0
+        var previousWeight: BigInteger? = null
         val rankedApps =
-            totalWeightByApp.entries
-                .sortedWith(
-                    compareByDescending<Map.Entry<String, BigInteger>> { it.value }
-                        .thenBy { it.key }
-                )
-                .mapIndexed { idx, entry ->
-                    NavigatorDappVoteRankingEntry(
-                        rank = idx + 1,
-                        appId = entry.key,
-                        weight = entry.value,
-                        contributingNavigators = navigatorSetByApp[entry.key]?.size?.toLong() ?: 0L,
-                    )
+            sortedApps.mapIndexed { idx, entry ->
+                if (previousWeight == null || entry.value.compareTo(previousWeight) != 0) {
+                    rank = idx + 1
+                    previousWeight = entry.value
                 }
+                NavigatorDappVoteRankingEntry(
+                    rank = rank,
+                    appId = entry.key,
+                    weight = entry.value,
+                    contributingNavigators = navigatorSetByApp[entry.key]?.size?.toLong() ?: 0L,
+                )
+            }
 
         val totalWeight = totalWeightByApp.values.fold(BigInteger.ZERO, BigInteger::add)
         return NavigatorDappVoteRoundRanking(
