@@ -17,7 +17,6 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 
@@ -47,10 +46,10 @@ class DiscordMessageFetchService(
 
     data class ChannelConfig(val name: String, val id: String)
 
-    @Scheduled(
-        fixedDelayString = "\${indexer.discord.interval-ms:3600000}",
-        initialDelayString = "\${indexer.discord.initial-delay-ms:60000}",
-    )
+    //    @Scheduled(
+    //        fixedDelayString = "\${indexer.discord.interval-ms:3600000}",
+    //        initialDelayString = "\${indexer.discord.initial-delay-ms:60000}",
+    //    )
     fun fetchMessages() {
         if (botToken.isBlank()) {
             logger.debug("Discord bot token not configured, skipping")

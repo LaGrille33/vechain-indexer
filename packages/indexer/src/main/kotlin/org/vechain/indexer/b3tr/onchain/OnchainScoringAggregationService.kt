@@ -14,7 +14,6 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.onchain.repository.AppOnchainScoreRepository
@@ -34,10 +33,10 @@ class OnchainScoringAggregationService(
         private const val WATERMARK_COLLECTION = "b3tr_onchain_scoring_watermark"
     }
 
-    @Scheduled(
-        fixedDelayString = "\${indexer.onchain-scoring.interval-ms:3600000}",
-        initialDelayString = "\${indexer.onchain-scoring.initial-delay-ms:120000}",
-    )
+    //    @Scheduled(
+    //        fixedDelayString = "\${indexer.onchain-scoring.interval-ms:3600000}",
+    //        initialDelayString = "\${indexer.onchain-scoring.initial-delay-ms:120000}",
+    //    )
     fun aggregateOnchainScores() {
         try {
             aggregateOnchainScoresInternal()
