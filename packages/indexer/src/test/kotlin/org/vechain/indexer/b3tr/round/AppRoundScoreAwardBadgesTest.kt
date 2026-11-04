@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.config.CachingThorClient
+import org.vechain.indexer.xapp.scoring.CommunityScoreService
 
 /**
  * Manual integration test that runs [AppRoundScoreService.awardBadges] in isolation against a real
@@ -71,7 +72,13 @@ internal class AppRoundScoreAwardBadgesTest {
 
     @Test
     fun `awardBadges awards xApp badges for a real round and prints results`() {
-        val service = AppRoundScoreService(mongoTemplate, thorClient, xAllocVotingContract, 20L)
+        val service =
+            AppRoundScoreService(
+                mongoTemplate,
+                thorClient,
+                xAllocVotingContract,
+                CommunityScoreService(mongoTemplate, 20L),
+            )
 
         val before = badgesForRound(roundId)
         println(

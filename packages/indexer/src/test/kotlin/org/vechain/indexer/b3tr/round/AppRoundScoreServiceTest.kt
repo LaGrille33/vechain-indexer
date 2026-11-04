@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Query
 import org.vechain.indexer.IndexerNames
 import org.vechain.indexer.b3tr.event.UserFirstSeenAggregationCompletedEvent
 import org.vechain.indexer.config.CachingThorClient
+import org.vechain.indexer.xapp.scoring.CommunityScoreService
 
 /**
  * Manual integration test that runs [AppRoundScoreService.onFirstSeenCompleted] against a real
@@ -62,7 +63,13 @@ internal class AppRoundScoreServiceTest {
 
     @Test
     fun `onFirstSeenCompleted scores a real round and prints results`() {
-        val service = AppRoundScoreService(mongoTemplate, thorClient, xAllocVotingContract, 20L)
+        val service =
+            AppRoundScoreService(
+                mongoTemplate,
+                thorClient,
+                xAllocVotingContract,
+                CommunityScoreService(mongoTemplate, 20L),
+            )
 
         // Hint: print the rounds that actually have action-summary data, in case roundId needs
         // adjusting before running.
