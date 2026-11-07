@@ -1,0 +1,32 @@
+{
+  "sourceArchiveSha256": "cba139d48f9d80e6d928394e08d96765a7d7cd0f7e37b989e722a06691145b12",
+  "sourceArchiveBytes": 85492,
+  "note": "Operator-installed source snapshot, 2026-11-06. Git publication does not update the NAS. Generated reports, private runtime state and connection diagnostics are excluded.",
+  "runtimeSha256": {
+    ".dockerignore": "4ebc063261a04c00a6d18dbbceafe2e85514e3b5a3b094c9aed6cd7a8c436af4",
+    "Dockerfile": "432a925058811e2114869eb139fe43d864fbedec401946288ef019549b82494e",
+    "compose.yaml": "e5b318dbb2c96846b920df65f72d7a3c8a99cf68306dcec4e1c6c7b1eec41990",
+    "package-lock.json": "6354de8f7e3d7e760c5e2e6ee9a85f49102ca9999f71c305f8085976db775863",
+    "package.json": "cfe1a6bfb39425c57889a592b29aa92d7978b6dc45eed41c17c22ca4fff2d76c",
+    "scripts/backup.sh": "3edff1dc4159aecd7ea717fa1bd7ffc8ba96ec26710527b581c65d1c07d36ce3",
+    "scripts/enable-dashboard-forwarding.sh": "dd5ac62b8097bf8321314101411cbcce6c86c7d4a72b801c9b0ae865650b7428",
+    "scripts/install-nas.sh": "255c8d35b79389f3182e032fa182cd0e091c2d05511e9371f9a5b131a8969cd2",
+    "scripts/update-nas.sh": "e18a5fd42f616bce127ae0b6a60f94660e546ac8e82e51f63835df66b7309f48",
+    "source-manifest.json": "ef0a6352f0734fc68d504dfeddd6613f1fd363c52eb3c3317b7eaf11890bf83e",
+    "sql/001-schema.sql": "f5fcad2964ce21be5acdb213357d3bf94300d428429fb381c4f5dea19769f724",
+    "sql/002-calculation.sql": "72a54e210846f4c289ce338082f931c3f95a33905e073f0beb93874e209fcd4e",
+    "sql/003-progress.sql": "81869e259f5b67f79a7546ea62d8c4a74f3d15d3feaa1d753d6d6d64fa52b3bb",
+    "sql/004-chain-source.sql": "8ce63a0b2bf88c4d4c3d6856a28ed624e8a4672ac68347ec7af23d46981fbfe1",
+    "src/chain-client.mjs": "11536c9ad23fbf7d11e6bf1bd89b6b44eed48a91ca85b0d8a75b3ed8b7f99bc7",
+    "src/chain-source.mjs": "865f6696152b0137ffba7436725ffe6ef6990bf81e18edb19cf64411f0d8e727",
+    "src/dashboard.mjs": "58d8b13e147e24157cf37830ad0fa8298af75b816f1578ca3d149a1931b6b93e",
+    "src/database.mjs": "4089e558a2dbd7ed9b3e05642887b883a1235408845b8e68e8afd6fb4d45df51",
+    "src/handler.mjs": "4a683a84f86666b1977a9adbe9f71da26a7d7768704694515883711cef4ba62a",
+    "src/job.mjs": "c2490b9904b7e3994e1b16e75fb914c22baaa06194ebbaec25f9386d0dc34408",
+    "src/progress-page.mjs": "4186116d5e15312037c96d86f55683870f5360d637cb1585dc184dd9c3dcc667",
+    "src/progress.mjs": "118964986e68d27172b3f6533c0f78e6913f9e1131e1d3eb5991918b0465af78",
+    "src/report.mjs": "0a516accb94bebe9980638b951feaf0aeb09915281de422cfaa35feda0786995",
+    "src/server.mjs": "41a81738da65a6791588965f6ce13b3b086adb5b9331bb4756618bbefcb3314f",
+    "src/snapshot.mjs": "3204d96698b022e56e8994f32bcaf19d72a630cf5c002c5fef0a57278d5c2e28"
+  }
+}

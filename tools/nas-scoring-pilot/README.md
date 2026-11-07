@@ -8,9 +8,9 @@ Committing or pushing these files does not change a running NAS container.
 ## Deployed-source provenance
 
 The `src/` and `sql/` files match the operator-installed November 6 bundle byte
-for byte. `deployment-provenance/` records its archive hash and original per-file
-hashes. Those manifests describe the deployed snapshot, not later repository
-metadata such as this README, the packaging script or ignore rules.
+for byte. `deployed-source.json` records its archive hash and original runtime
+file hashes. It describes the deployed snapshot, not later repository metadata
+such as this README, the packaging script or ignore rules.
 
 The NAS contains private runtime state; it is deliberately absent from Git:
 password files, database files, source wallet ledgers, imports, exports, logs,

@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 ROOT_FILES = (
     ".dockerignore", ".gitignore", "Dockerfile", "README.md", "SETUP.txt",
     "compose.yaml", "package.json", "package-lock.json", "source-manifest.json",
-    "recover-from-mac.sh",
+    "recover-from-mac.sh", "deployed-source.json",
 )
-SOURCE_DIRS = ("src", "sql", "scripts", "test", "preview", "deployment-provenance")
+SOURCE_DIRS = ("src", "sql", "scripts", "test")
 
 
 def main():
