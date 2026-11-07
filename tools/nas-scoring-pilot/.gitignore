@@ -1,0 +1,13 @@
+node_modules/
+config/*
+data/
+backups/
+*.tar.gz
+.nas-install-prepared
+dist/
+preview/
+deployment-provenance/
+.env*
+*.log
+__pycache__/
+*.py[cod]

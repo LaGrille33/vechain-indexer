@@ -1,0 +1,381 @@
+VeBetter scoring pilot — temporary Synology deployment (2026-11-06)
+
+Target: Jerome's DS220+, 6 GB RAM, DSM 7.4.1 (reported by Jerome).
+Status: installed NAS services are healthy and the private dashboard works.
+The new blockchain runner is prepared locally; its NAS update is still pending.
+Twenty-five local tests, Compose validation and shell syntax checks pass. User's SSH screenshot confirms x86_64, about 4.4 GiB available RAM,
+5.6 TB free on /volume1, Docker 24.0.2, Compose 2.20.1 and sudo Docker access.
+The two pilot containers were subsequently installed and verified healthy.
+Login is jerome_admin; Jerome changed SSH to port 2222. Use scp -O -P 2222
+for uploads and ssh -p 2222 for logins/tunnels. Earlier agent SSH tests used 22.
+
+Components
+  PostgreSQL 17: persistent inputs, source manifests, calculation runs and results.
+  Node 22: private dashboard, public-mainnet backfill, manual jobs and HTML reports.
+  Same SQL, percentile rule and dashboard as the existing Cloudflare pilot.
+  Activity and Distribution only, with a subtotal out of 60. Report-only partial
+  subtotals are out of 51 when new-user history is unavailable. Profile/Community
+  and testnet review/badge transactions require their separate implementation.
+
+The default limits are 1.5 GB for Postgres and 384 MB for the engine. Each
+process uses up to three DB connections; run one batch at a time on this NAS.
+CPU quotas are intentionally unset: this NAS kernel rejected Compose cpus /
+Docker NanoCPUs because CPU CFS bandwidth control is unavailable. Memory limits
+are retained. The quota, bind-directory and health-check issues are now resolved.
+No automatic schedule is installed. Confirm free NAS RAM,
+disk capacity and other workloads before deployment. These are initial limits,
+not measured performance/capacity guarantees. No full-chain node is installed.
+
+Directory: choose /volume1/docker/vebetter-scoring-pilot if volume1 exists;
+otherwise use the NAS's actual Docker volume. Keep Navigator in its own project.
+
+Private operator setup
+  Create config/database_password yourself on the NAS. Do not paste its contents
+  into chat, a command visible to the agent, or the repository. Keep config/
+  accessible only to your DSM account (mode 700). The password file must be
+  readable by the containers' postgres/node users; mode 444 inside that private
+  directory allows Docker Compose file-secret mounts to work. Do not share the
+  config directory. There is no password in this bundle or its environment.
+  The private NAS database is new and separate from VeCarbon's source database.
+
+Installation (new isolated directory, on NAS)
+  After copying the archive and extracting into a NEW project directory, run:
+    sudo sh scripts/install-nas.sh
+  The installer creates a private local database password without displaying it,
+  prepares the new project's directories, builds/starts only its two services,
+  checks health/schema and prints the correct Mac SSH tunnel command.
+  It does not fetch production data or start a backfill. If a build/start fails,
+  preserve the project/password/data and inspect it; do not re-extract over it.
+  For the already-uploaded initial package's CPU quota error, on the NAS run:
+    sudo sed -i '/^[[:space:]]*cpus:/d' /volume1/docker/vebetter-scoring-pilot/compose.yaml
+    sudo sh /volume1/docker/vebetter-scoring-pilot/scripts/install-nas.sh
+  This resumes the existing project/password. Do not rerun the fresh extraction.
+  Synology requires the database bind-source directory to exist before startup.
+  If the first uploaded installer reports data/postgres does not exist, run:
+    sudo mkdir -p /volume1/docker/vebetter-scoring-pilot/data/postgres
+    sudo sh /volume1/docker/vebetter-scoring-pilot/scripts/install-nas.sh
+  The refreshed installer creates this directory explicitly.
+  If DB is healthy but engine is unhealthy, the first package's health probe
+  used 127.0.0.1 while the server's allowed origin is localhost. Node fetch's
+  custom Host override did not fix that mismatch (locally reproduced 403 vs
+  localhost 200). Correct only the NAS probe and resume:
+    sudo sed -i 's|http://127.0.0.1:8788/health|http://localhost:8788/health|g' /volume1/docker/vebetter-scoring-pilot/compose.yaml
+    sudo sh /volume1/docker/vebetter-scoring-pilot/scripts/install-nas.sh
+  This preserves database/password/data and the application's host protection.
+
+  Manual alternative (requires privately prepared password and directory ownership):
+  docker compose config --quiet
+  docker compose up -d --build
+  docker compose ps
+  docker compose exec -T db psql -U scoring_owner -d vebetter_scoring -c '\dt reputation_pilot.*'
+
+Initial schema installation runs only when data/postgres is empty. Existing
+databases are not migrated automatically. Never replace data/postgres or use
+down --volumes to resolve an initialization error. Preserve it for inspection.
+For an older pilot without the progress tables, the owner must apply migration
+003 once before using progress commands:
+  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U scoring_owner -d vebetter_scoring < sql/003-progress.sql
+Do not run it twice or apply it to an unrelated/source database.
+The currently installed NAS already has 003. The incremental updater below
+applies 004 once, explicitly; existing DB initialization never reruns itself.
+
+Dashboard
+  Neither Postgres nor the dashboard publishes a host port. Docker's official
+  documentation notes that releases before 28 can expose localhost-published
+  ports to other hosts on the same network segment. This NAS runs Docker 24,
+  so use SSH directly to the unpublished container bridge address instead.
+  The installer prints the correct command for the current private address:
+    ssh -p 2222 -N -L 8788:CONTAINER_PRIVATE_IP:8788 jerome_admin@192.168.1.141
+  After a container recreation the IP can change; retrieve it with:
+    sudo docker inspect --format '{{(index .NetworkSettings.Networks "vebetter-scoring-pilot_outbound").IPAddress}}' "$(sudo docker compose ps -q engine)"
+  Then open http://localhost:8788 in the Mac browser.
+  This adapter trusts the SSH tunnel; DSM reverse proxy does not itself add DSM
+  login protection. Do not publish port 8788 to the LAN/Internet. Remote/public
+  hosting needs a separately authenticated gateway and a reviewed adapter.
+
+  If SSH reports administratively prohibited, first inspect effective server
+  forwarding policy. This NAS returned AllowTcpForwarding no, DisableForwarding
+  no and PermitOpen any. An optional operator helper is provided:
+    sudo sh scripts/enable-dashboard-forwarding.sh "$SSH_CONNECTION" 2222
+  Run it from the NAS SSH session and keep that session open. It backs up the
+  existing SSH config, proposes a Match User jerome_admin rule allowing only
+  local forwarding to the current private engine IP:8788, checks syntax and
+  effective account policy, verifies the global policy stays unchanged, then
+  signals only the validated SSH master PID to reload. Checks fail before the
+  live file is changed; failures during installation restore its backup.
+  The helper prints the backup path and tunnel command. Browser/new-tunnel
+  verification is still necessary. It does not change firewall, authentication,
+  cryptographic algorithms or published ports. It refuses duplicate blocks.
+  If the private container IP changes later, inspect/update the narrow rule.
+
+Round-50 timeout recovery (November 6)
+  Confirmed by operator PostgreSQL logs: the former WITH totals AS aggregation
+  exceeded the 120-second statement limit after all round-50 pages were saved.
+  The updated source snapshot uses separate per-app aggregates bounded by the
+  existing round/app and first-seen indexes. Only this transaction gets a
+  600-second per-statement limit and disables parallel query workers. Ingestion
+  and ordinary requests keep the general 120-second limit. First-seen writes
+  now update an existing pair only when an earlier round is discovered, avoiding
+  unchanged rewrites. Financial/count/ranking rules and source policy are unchanged.
+  SQLSTATE is logged without SQL/exception payloads, known database failures
+  have controlled codes, and failed-job elapsed time stops at its failure time.
+
+  On Jerome's LOCAL MAC Terminal, the separate workspace helper can upload,
+  back up/update and request resume of existing job 0433a319-dc73-44ce-873f-54557f6b0338:
+    sh "/Users/jerome/Dropbox/VeChain Foundation/AI scripts/VeBetter dApp scoring/2026-11-06 Resume backfill after timeout fix.sh"
+  Enter any authentication privately in that Terminal. Keep it open during
+  backup/build; a database dump can take several minutes. It refuses update
+  while any job is pending/running. It does not reset data or register a new
+  job; failed commands stop the helper before resume. Review the printed bridge
+  IP if the tunnel stops working. Job submission is not proof of completion;
+  verify progress on /progress and retain this job UUID after any later failure.
+
+  Validation: 25 tests pass. Recomputed the cached real mainnet round-122
+  snapshot (37 apps, 95,716 source logs) with the new queries: identical canonical
+  input hash to the previous implementation. This does not benchmark NAS
+  round-50 performance; verify that on resume. No source pages need refetching.
+
+Non-interactive Docker CLI lookup / Mac read permissions (November 6)
+  Operator retry reached the NAS updater but stopped before backup/code changes:
+  docker: command not found. Interactive DSM shells know Docker's location,
+  while this non-interactive SSH/sudo shell did not. The updater and remote
+  recovery shell now set a fixed PATH containing standard DSM Docker and
+  Container Manager directories. The final sudo resume uses the discovered
+  absolute Docker executable, independent of sudo PATH resetting.
+  Progress messages identify the CLI, backup start/end and build stage.
+  No package installation, Docker daemon or system PATH change is involved.
+
+  The Mac operator account could not traverse the owner's mode-700 Dropbox
+  directory. Use a prepared /private/tmp recovery copy when supplied; it contains
+  only readable code/archive, never passwords or source data. Run it WITHOUT
+  Mac sudo; the NAS updater still asks for its required sudo authentication.
+  This avoids changing Dropbox permissions or using root's SSH trust store.
+
+Incremental update of the existing NAS pilot
+  Upload the refreshed archive from a Mac Terminal using legacy SCP:
+    scp -O -P 2222 "/Users/jerome/Dropbox/VeChain Foundation/AI scripts/VeBetter dApp scoring/2026-11-06 Synology scoring pilot.tar.gz" jerome_admin@192.168.1.141:vebetter-scoring-update.tar.gz
+  In the existing NAS SSH session, run these as separate commands:
+    mkdir -p "$HOME/vebetter-scoring-update"
+    tar -xzf "$HOME/vebetter-scoring-update.tar.gz" -C "$HOME/vebetter-scoring-update"
+    sudo sh "$HOME/vebetter-scoring-update/vebetter-scoring-pilot/scripts/update-nas.sh"
+  The updater verifies file hashes/project identity and refuses pending/running
+  jobs. It backs up code and dumps the existing pilot DB, copies only code/SQL,
+  builds the engine, applies additive migration 004 once, and replaces only
+  the engine. It preserves compose.yaml, config/password, all data and SSH rules.
+  No backfill is started. This backup has not yet had a restore drill.
+  Check the printed bridge IP. If it changes, the existing scoped PermitOpen
+  and tunnel must be updated before browser access works. Do not broaden SSH
+  forwarding or publish dashboard ports. Keep the existing NAS session open.
+
+Public-mainnet backfill (operator starts it AFTER the update)
+  Uses HTTPS public mainnet chain/indexer endpoints; no API keys, signing keys
+  or VeCarbon database credentials are required. It writes only the NAS pilot.
+  Historical app populations and exact allocations are read at finalized round
+  boundaries. Reward events supply exact amounts, wallets and action counts.
+  Event order follows EmissionDistributed/V2, including within-block positions,
+  matching the official indexer's cycle boundaries. Zero-activity apps remain.
+  Public indexer totals are a separate diagnostic check: counts must match and
+  financial differences must fit its floating-point precision tolerance.
+  Source failures or mismatches fail the job rather than substituting zeros.
+
+  Initial SMALL pilot, detached so leaving SSH does not stop it:
+    sudo docker compose -f /volume1/docker/vebetter-scoring-pilot/compose.yaml exec -d engine sh -c 'node src/job.mjs chain mainnet 1 3 >> /logs/launcher.jsonl 2>&1'
+  Follow /progress and verify its report before the full range:
+    sudo docker compose -f /volume1/docker/vebetter-scoring-pilot/compose.yaml exec -d engine sh -c 'node src/job.mjs chain mainnet 1 latest >> /logs/launcher.jsonl 2>&1'
+  Run ONE job at a time. A new job from 1 reuses committed source pages; identical
+  snapshots/runs are reused when input and calculation versions match.
+  'latest' is resolved once, to the last completed round at a finalized anchor.
+  No perpetual schedule is installed and no live incomplete round is scored.
+
+  Job UUIDs are printed in data/logs/launcher.jsonl and shown at /progress.
+  Resume a failed/stale job with its UUID (same pinned plan/cursor):
+    sudo docker compose -f /volume1/docker/vebetter-scoring-pilot/compose.yaml exec -d engine sh -c 'node src/job.mjs chain mainnet 1 latest JOB_UUID >> /logs/launcher.jsonl 2>&1'
+  Replace JOB_UUID with the real UUID. Do not resume an actively running job.
+  Detached jobs survive an SSH disconnect, but container/NAS restarts require
+  this explicit resume. There is no automatic whole-job retry daemon.
+
+  Per-page wallet aggregates and source cursors commit atomically in Postgres.
+  Full first-seen history is claimed only after all rounds from 1 are scanned;
+  round 1 also scans earlier chain history and retains pre-round-1 first-seen
+  entries as round 0. New users means first rewarded interaction per app.
+  Starting at a recent round leaves new_users null and yields only /51 report
+  subtotals. Do not use the diagnostic API's rounded financial values as inputs.
+  Source caches retain wallet-level aggregates locally (not proof payloads).
+  They are private data and excluded from shared HTML/JSON reports and bundles.
+
+  Live local validation on November 6: round 1, eight historical apps, zero
+  reward events; all eight API checks match, full /60 SQL execution/report parity
+  passes. Round 122: 95,716 reward events, 37 historical apps, all 37 API checks
+  match. Its report is explicitly /51 because intervening history is not yet
+  scanned. These two checks do not establish whole-history or NAS performance.
+  The current tied-percentile rule gives a tied nonzero score even if every
+  app has zero activity; this is parity with the existing formula, not evidence
+  of actual engagement. Product changes require a separate formula version.
+
+Prepared-snapshot ingestion
+  Optional normalized files are still supported. Navigator first-seen archives
+  need their own shard/completeness/cutoff audit before reuse.
+
+  Put normalized JSON snapshots in data/imports. Required structure:
+    network: mainnet or testnet
+    round_id: integer
+    source_block_number: nonnegative integer STRING
+    source_block_id: 0x + 64 lower-case hex characters, from the real checkpoint
+    round_end_timestamp: Unix seconds, integer
+    new_user_history_complete: boolean, false until history is actually verified
+    source_manifest: object recording source, retrieval time, coverage proof,
+                     historical membership evidence and indexer checkpoints
+    app_ids: complete historical on-chain list, including apps with zero activity
+    metrics: array of objects with app_id plus STRING fields active_users,
+             actions, allocated, distributed, and new_users as STRING or null
+
+  Amounts are human B3TR units with up to 18 decimal places. Counts must be
+  integer strings to preserve values beyond JavaScript's safe integer range.
+  Unknown new users stay null. Each app must appear exactly once. The importer
+  checks shape/membership consistency; it cannot independently prove that your
+  supplied on-chain list or coverage assertion is true. The source extractor
+  and reconciliation must establish that before new_user_history_complete=true.
+
+  docker compose exec -T engine node src/job.mjs import /imports/round-96.json
+  docker compose exec -T engine node src/job.mjs list
+  docker compose exec -T engine node src/job.mjs execute RUN_UUID
+
+  Alternatively, run 'node src/job.mjs next' inside the engine to process one
+  pending run. No schedule is installed. Incomplete snapshots are saved without
+  creating a run. A complete import registers a run but does not execute it.
+  Canonical input hashes and hashed calculation code identify snapshots/runs.
+  Identical imports reuse the same snapshot/run; completed executions are
+  idempotent. Corrections create new versions; frozen history is not overwritten.
+  The web execution endpoint defaults disabled. Use the manual CLI initially.
+
+HTML calculation reports
+  docker compose exec -T engine node src/job.mjs report mainnet 96
+  docker compose exec -T engine node src/job.mjs report-all mainnet
+
+  The first command exports every app in the newest saved round-96 snapshot.
+  The second exports every saved mainnet round, choosing its newest snapshot.
+  Testnet is a separate selector: never combine its ranks with mainnet.
+  No 200-app display limit applies. Files are saved under data/exports with
+  unique names: an offline HTML report and an exact-decimal JSON companion.
+  Existing files are not overwritten. No external scripts or assets are needed.
+
+  Reports include raw metrics, app labels when source_manifest.app_names is
+  supplied, app IDs, per-metric below/tie counts and percentiles, activity
+  weights, full-precision allocation/distribution strings, efficiency capped at
+  one, weighted contributions, competition ranks and source/run/code hashes.
+  Financial precision is exactly that of the saved input, not an assertion that
+  the original API supplied on-chain 18-decimal precision. Verify source precision.
+
+  With verified new-user history, report scores match the current Kotlin rule
+  and are compared with an attached completed run when one exists. A report
+  made from unexecuted inputs says that it is not a saved full scoring run.
+  Without verified history, the new-user percentile/term is excluded for ALL
+  apps in that round; Active Wallets and Actions retain weights 0.5 and 0.2.
+  Their partial Activity maximum is 70, weighted at 30% (maximum 21), plus
+  Distribution weighted at 30% (maximum 30): available subtotal maximum 51.
+  No rescaling to 100, invented new-user zeros or full-reputation rank is shown.
+  Full Activity/Distribution has maximum 60. Profile/Community remain excluded
+  because this package has no approved inputs/calculators for them.
+  Incomplete app populations withhold percentiles, scores and rankings.
+
+  Missing-new-user partial results are report artifacts only; the existing full
+  scoring_run API remains strict and still requires complete new-user history.
+  Reports use a read-only repeatable-read DB transaction. They read saved
+  snapshots, not production source tables. Arbitrary source manifests, database
+  connection details and wallet records are not included in report exports.
+  Report generation reads stored inputs; the separate blockchain runner fetches
+  source history and records its coverage evidence.
+
+Progress monitoring and round-by-round processing
+  Open http://localhost:8788/progress through the same private SSH tunnel.
+  It refreshes every 5 seconds and shows phase, current round, completed/total
+  rounds, source kind, processed records, source units, retries, elapsed time,
+  last heartbeat, rough remaining-time range and approximate completion time.
+  An HTML report link appears when report generation finishes. No job displays
+  as a running blockchain backfill just because the tracker exists.
+
+  The ETA uses the last five successfully completed rounds, after at least
+  three timings exist. It adjusts for elapsed work on the current round. It is
+  a rough estimate, not a deadline: round sizes, first-seen work and retries vary.
+  A 15-second heartbeat supports stale detection; after 45 seconds without one,
+  ETA is withheld. Reporting is a separate finalization phase, so 100% of rounds
+  does not claim that the entire job/report is already finished.
+
+  Both blockchain and optional prepared-file batches update this page. For
+  blockchain jobs units are fetched event pages, records are source event logs;
+  a page total is unknown until the round scan finishes. App metadata lookups
+  and reconciliation can take time while record counters stay unchanged.
+  Retries counts repeated round attempts, not individual HTTP request retries.
+  Up to four public HTTP retries use backoff. A failed job needs manual resume.
+  Page-level cache checkpoints avoid downloading committed pages again.
+
+  The following optional runner consumes already prepared snapshot files;
+  its units are files and its records are app metric rows.
+  Create a JSON plan under data/imports with this structure:
+    {"network":"mainnet","rounds":[
+      {"round":96,"file":"/imports/round-96.json","sha256":"REPLACE_WITH_FILE_SHA256"},
+      {"round":97,"file":"/imports/round-97.json","sha256":"REPLACE_WITH_FILE_SHA256"}
+    ]}
+  Use the SHA-256 of each complete input file, e.g.:
+    sha256sum data/imports/round-96.json
+  The driver validates each file hash and its network/round before importing.
+
+  Start (prints a job UUID immediately):
+    docker compose exec -T engine node src/job.mjs process /imports/plan.json
+  Inspect while it runs, from another terminal:
+    docker compose exec -T engine node src/job.mjs status JOB_UUID
+  Resume the same job after a failure/restart:
+    docker compose exec -T engine node src/job.mjs process /imports/plan.json JOB_UUID
+
+  Job state, counters and per-round checkpoints live in Postgres, not in the
+  browser. A round's import/calculation and completion checkpoint commit in
+  one transaction. Resume skips completed rounds. Prepared files are reread for
+  unfinished rounds; blockchain rounds resume the committed page cursor.
+  The exact same plan/file hashes are required. For corrected inputs start a
+  new job/snapshot version. A per-job direct-Postgres session lock prevents two
+  workers from running the same job; session-lock behavior and multiple real
+  connections still need verification on the deployed server (WASM tests do not
+  establish real Postgres concurrency). No automatic retry loop is installed.
+
+  Logs: data/logs/backfill-JOB_UUID.jsonl (mounted at /logs). Follow them with:
+    tail -f data/logs/backfill-JOB_UUID.jsonl
+  Rotation keeps current + two previous files, at about 5 MB each. Logs contain
+  controlled phase/events and round IDs, not credentials, source payloads or
+  arbitrary exception messages. Postgres is the authoritative recovery state.
+  Ensure the container's node user (UID 1000) can write data/exports and
+  data/logs on the NAS; inspect actual DSM ACLs before changing permissions.
+
+Storage and backups
+  data/postgres: database files, including durable source cursors, per-app/wallet
+  ledgers, immutable snapshots, scoring runs/results and progress. Do not copy
+  these live as a backup.
+  data/imports: normalized source snapshots; preserve alongside provenance.
+  data/exports: HTML/JSON reports and future rollout handoff files.
+  backups: pg_dump custom-format files produced by 'sh scripts/backup.sh'.
+  Backups are not automatically scheduled or deleted. Before relying on them,
+  restore a dump into a separate scratch database and compare row counts and
+  saved input hashes. Keep an additional copy off this NAS. Never restore over
+  a running database as a test.
+
+Migration later
+  Move logical Postgres data plus input snapshots/manifests and exact formula/
+  code versions into the approved destination. Reuse only validated results
+  whose input and formula versions match rollout. No production write access
+  is required while this temporary NAS database stores the results.
+
+Local validation
+  npm ci --ignore-scripts
+  npm test
+  docker compose config --quiet
+  Twenty-five tests pass, including SQL import/retry/execution in PostgreSQL/WASM,
+  immutable snapshots, unknown-history blocking, exact numeric handling and
+  local HTTP access checks, exact report parity with seven Kotlin fixture sets,
+  missing-history partial scores, over-200-app reports and safe export escaping.
+  Progress tests cover ETA warm-up/staleness, failure/resume skipping completed
+  rounds, atomic calculation/checkpoint commits and the report finalization phase.
+  Shared SQL has prior Kotlin parity coverage.
+  New tests cover event ordering, exact uint256 amounts, page cursor/replay,
+  rollback, partial-history withholding and API mismatch failure. Actual NAS
+  PostgreSQL startup is verified; real multi-connection concurrency, source job
+  throughput/ETA and backup/restore still require NAS smoke tests. The new runner
+  has not yet been installed or run on the NAS.

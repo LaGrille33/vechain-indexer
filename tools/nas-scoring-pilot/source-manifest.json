@@ -1,0 +1,21 @@
+{
+  "source_base_commit": "a35accf2",
+  "source_note": "Uncommitted Cloudflare scoring pilot; copied shared handler/dashboard and Kotlin-parity SQL unchanged.",
+  "sha256": {
+    "src/handler.mjs": "4a683a84f86666b1977a9adbe9f71da26a7d7768704694515883711cef4ba62a",
+    "src/dashboard.mjs": "58d8b13e147e24157cf37830ad0fa8298af75b816f1578ca3d149a1931b6b93e",
+    "sql/001-schema.sql": "f5fcad2964ce21be5acdb213357d3bf94300d428429fb381c4f5dea19769f724",
+    "sql/002-calculation.sql": "72a54e210846f4c289ce338082f931c3f95a33905e073f0beb93874e209fcd4e"
+  },
+  "kotlin_reference_sha256": "85575225d4917efac318caf931ea619a0977d4c4d1ae459a243acfa28808eedb",
+  "local_migrations": {
+    "sql/003-progress.sql": "81869e259f5b67f79a7546ea62d8c4a74f3d15d3feaa1d753d6d6d64fa52b3bb",
+    "sql/004-chain-source.sql": "8ce63a0b2bf88c4d4c3d6856a28ed624e8a4672ac68347ec7af23d46981fbfe1"
+  },
+  "chain_source_policy": "mainnet-reward-events-v1",
+  "public_sources": [
+    "https://mainnet.vechain.org",
+    "https://indexer.mainnet.vechain.org"
+  ],
+  "runtime_fix": "2026-11-06 round-50 source aggregation timeout: bounded per-app queries, localized timeout, unchanged scoring SQL"
+}

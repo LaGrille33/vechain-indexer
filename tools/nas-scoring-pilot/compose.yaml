@@ -1,0 +1,64 @@
+name: vebetter-scoring-pilot
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: vebetter_scoring
+      POSTGRES_USER: scoring_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    secrets: [database_password]
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    networks: [database]
+    restart: unless-stopped
+    mem_limit: 1536m
+    shm_size: 128m
+    command: [postgres, -c, shared_buffers=128MB, -c, work_mem=8MB, -c, max_connections=20]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U scoring_owner -d vebetter_scoring']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '3'}
+  engine:
+    build: .
+    environment:
+      PGHOST: db
+      PGDATABASE: vebetter_scoring
+      PGUSER: scoring_owner
+      PGPASSWORD_FILE: /run/secrets/database_password
+      PILOT_ORIGIN: http://localhost:8788
+      EXECUTION_ENABLED: 'false'
+    secrets: [database_password]
+    # Keep ports unpublished. Access the private bridge address over SSH.
+    # Docker <28 has a documented localhost-publish reachability issue.
+    volumes:
+      - ./data/imports:/imports:ro
+      - ./data/exports:/exports
+      - ./data/logs:/logs
+    networks: [database, outbound]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:8788/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '3'}
+secrets:
+  database_password:
+    file: ./config/database_password
+networks:
+  database: {internal: true}
+  outbound: {}

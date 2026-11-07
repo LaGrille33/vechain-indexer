@@ -1,0 +1,13 @@
+{
+  "name": "vebetter-synology-scoring-pilot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "job": "node src/job.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": { "pg": "8.23.1", "ethers": "6.17.0" },
+  "devDependencies": { "@electric-sql/pglite": "0.5.15" }
+}
